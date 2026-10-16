@@ -27,8 +27,8 @@ export function createScene(canvas: HTMLCanvasElement) {
   renderer.toneMappingExposure = 1.1;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(PALETTE.navy);
-  scene.fog = new THREE.FogExp2(PALETTE.fog, CONFIG.NIGHT.fog);
+  scene.background = new THREE.Color(PALETTE.skyHorizon);
+  scene.fog = new THREE.FogExp2(PALETTE.fog, CONFIG.SUNSET.fog);
 
   // Third-person camera: behind and above the wizard on the wall, looking down the field.
   const camera = new THREE.PerspectiveCamera(CONFIG.CAMERA.fov, 1, 0.1, 1000);
@@ -37,17 +37,17 @@ export function createScene(canvas: HTMLCanvasElement) {
   camera.position.copy(camBase);
   camera.lookAt(lookAt);
 
-  // Night lighting: dim cold sky fill + blue moonlight from behind the castle (so the monsters'
-  // faces are lit), torches add warm pools near the wall. Lightning briefly lights everything.
-  const sky = new THREE.HemisphereLight(0x5a64b8, 0x120c1c, CONFIG.NIGHT.ambient);
+  // Sunset lighting: warm sky fill (peach above, dusky purple from the ground), a warm key light
+  // from behind the castle (so the monsters' faces are lit), and the low sun behind the monsters
+  // as an orange rim light on their silhouettes. Lightning briefly lights everything.
+  const sky = new THREE.HemisphereLight(0xffc4a0, 0x3a2346, CONFIG.SUNSET.ambient);
   scene.add(sky);
-  const moon = new THREE.DirectionalLight(0x9fb4ff, CONFIG.NIGHT.moon);
-  moon.position.set(25, 40, 40);
-  moon.castShadow = CONFIG.SHADOWS;
-  scene.add(moon);
-  // Cold rim light from behind the enemies, so their silhouettes read against the dark.
-  const rim = new THREE.DirectionalLight(0x6a5cff, 1.2);
-  rim.position.set(-20, 10, -100);
+  const key = new THREE.DirectionalLight(0xffd8b0, CONFIG.SUNSET.key);
+  key.position.set(25, 40, 40);
+  key.castShadow = CONFIG.SHADOWS;
+  scene.add(key);
+  const rim = new THREE.DirectionalLight(0xff8a3a, CONFIG.SUNSET.rim);
+  rim.position.set(CONFIG.SCENERY.sun.x, CONFIG.SCENERY.sun.y, CONFIG.SCENERY.sun.z);
   scene.add(rim);
 
   const environment = createEnvironment(scene);
@@ -63,7 +63,7 @@ export function createScene(canvas: HTMLCanvasElement) {
     fire(from, to, ELEMENT_COLOR[enemy.element], () => particles.burst(to, 0xff5030, 25, 4, 1, 0.6));
   });
 
-  // Bloom makes emissive things (eyes, orbs, torches, moon) glow.
+  // Bloom makes emissive things (eyes, orbs, torches, sun) glow.
   // Multisampled render target: without it the post-processing path loses anti-aliasing (jagged edges).
   // The depth texture lets the ink pass find silhouettes.
   const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: CONFIG.MSAA_SAMPLES });
@@ -207,7 +207,7 @@ export function createScene(canvas: HTMLCanvasElement) {
     }
     // Lightning flash: the whole scene lights up for a moment.
     lightningT = Math.max(0, lightningT - dt * 4);
-    sky.intensity = CONFIG.NIGHT.ambient + lightningT * 6;
+    sky.intensity = CONFIG.SUNSET.ambient + lightningT * 6;
     enemies.update(world, time, dt);
     updateShots(dt);
     updateWaves(dt);

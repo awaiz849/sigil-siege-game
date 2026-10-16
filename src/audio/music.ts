@@ -1,4 +1,4 @@
-// Synthesized background music for the night siege (Web Audio, no audio files):
+// Synthesized background music for the siege (Web Audio, no audio files):
 //   ambience  soft low wind (low-passed noise, slowly gusting), quiet (CONFIG.MUSIC_WIND)
 //   pad       a dark minor chord that slowly swells and shifts (A minor -> F -> G -> E)
 //   drums     war drums; tempo and density rise with the intensity level (wave / boss)

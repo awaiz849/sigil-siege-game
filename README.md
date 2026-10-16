@@ -1,6 +1,6 @@
 # Sigil Siege
 
-**Defend a castle wall with no controller.** You play a wizard on the battlements at night (third-person 3D) and draw
+**Defend a castle wall with no controller.** You play a wizard on the battlements at sunset (third-person 3D) and draw
 sigils in the air with one finger, tracked by your webcam.
 **The shape picks the spell. Where you draw picks the target.**
 

@@ -1,25 +1,26 @@
-// Colours for the 3D world. Night / dusk mood matching our pixel deck (navy + gold).
+// Colours for the 3D world. Sunset mood: orange horizon, magenta-to-indigo sky, purple mountains.
 import type { Element } from '../game/types.ts';
 
 export const PALETTE = {
   navy: 0x0d0b24,
   gold: 0xf2c14e,
-  skyTop: 0x03020a,
-  skyMid: 0x0b0a22,
-  skyHorizon: 0x1c1840,
-  horizonGlow: 0x7a1e3a, // faint blood-red glow low on the horizon: something is coming
-  fog: 0x0e0c22,
-  moon: 0xfff1cf,
-  grass: 0x22433a,
-  grassDark: 0x142a26,
-  road: 0x5e4c44,
-  roadDark: 0x3e322e,
+  skyTop: 0x7a70c0, // lavender high up
+  skyMid: 0xcb9cc8, // pink-lilac
+  skyHorizon: 0xffb27c, // peach at the horizon
+  horizonGlow: 0xffc27a, // the setting sun's glow
+  fog: 0xcaa6bc, // lilac haze (matches the mountains' misty feet)
+  sun: 0xfff2c4,
+  sunHalo: 'rgba(255,205,130,0.75)',
+  grass: 0x6a9a4a,
+  grassDark: 0x3f6e38,
+  road: 0x9f8a6c,
+  roadDark: 0x7f6a52,
   stone: 0x7d7a8c,
-  stoneDark: 0x4d4a5c,
+  stoneDark: 0x8a7f78,
   wood: 0x5a3b24,
   torch: 0xffa040,
-  pine: 0x173630,
-  pineDark: 0x0e2420,
+  pine: 0x3a7046,
+  pineDark: 0x24503a,
   robe: 0x2b1f3d,
 };
 

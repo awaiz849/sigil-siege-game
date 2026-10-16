@@ -1,5 +1,6 @@
-// The static world around the battlefield: sky, stars, moon, mountains, field, road, forest,
-// rocks, the castle wall we stand on, torches, and drifting fireflies.
+// The static world around the battlefield: field, road, forest, rocks, the castle wall we stand on,
+// torches, mist and drifting embers. The sunset sky and mountains are in sky.ts, the river, bridge,
+// far castle, siege towers and fences in valley.ts, the ground shape in terrain.ts.
 // Everything is built from three.js primitives (no downloaded assets).
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
@@ -7,6 +8,9 @@ import { toon } from './toon.ts';
 import { CONFIG } from '../config.ts';
 import { PALETTE } from './palette.ts';
 import { createLandmarks } from './landmarks.ts';
+import { createSky } from './sky.ts';
+import { createValley } from './valley.ts';
+import { groundHeight, nearestRiver, noise2, roadAmount } from './terrain.ts';
 
 /** Small seeded random so the scenery looks the same every time. */
 function makeRandom(seed: number) {
@@ -18,24 +22,14 @@ function makeRandom(seed: number) {
 const rand = makeRandom(7);
 const range = (a: number, b: number) => a + rand() * (b - a);
 
-/** Smooth-ish value noise for hills and colour variation. */
-function noise2(x: number, z: number): number {
-  return (
-    Math.sin(x * 0.11 + Math.sin(z * 0.07) * 2) * 0.5 +
-    Math.sin(z * 0.13 + x * 0.05) * 0.35 +
-    Math.sin((x + z) * 0.31) * 0.15
-  );
-}
-
 export function createEnvironment(scene: THREE.Scene) {
   const updaters: Array<(t: number, dt: number) => void> = [];
 
-  scene.add(createSky());
-  const stars = createStars();
-  scene.add(stars);
-  scene.add(createMoon());
-  createMountains().forEach((m) => scene.add(m));
+  const sky = createSky(scene);
+  updaters.push(sky.update);
   scene.add(createGround());
+  const valley = createValley(scene);
+  updaters.push(valley.update);
   scene.add(createForest());
   scene.add(createRocks());
   const wall = createWall();
@@ -50,9 +44,6 @@ export function createEnvironment(scene: THREE.Scene) {
   scene.add(fireflies.points);
   updaters.push(fireflies.update);
 
-  // Stars twinkle slowly.
-  const starMat = stars.material as THREE.PointsMaterial;
-  updaters.push((t) => (starMat.opacity = 0.75 + Math.sin(t * 0.7) * 0.15));
 
   return {
     update(t: number, dt: number) {
@@ -61,123 +52,15 @@ export function createEnvironment(scene: THREE.Scene) {
   };
 }
 
-// ---------------------------------------------------------------- sky
-
-function createSky(): THREE.Mesh {
-  // Big inverted sphere with a vertical gradient + a warm glow low on the horizon.
-  const geo = new THREE.SphereGeometry(400, 32, 16);
-  const mat = new THREE.ShaderMaterial({
-    side: THREE.BackSide,
-    depthWrite: false,
-    fog: false,
-    uniforms: {
-      top: { value: new THREE.Color(PALETTE.skyTop) },
-      mid: { value: new THREE.Color(PALETTE.skyMid) },
-      horizon: { value: new THREE.Color(PALETTE.skyHorizon) },
-      glow: { value: new THREE.Color(PALETTE.horizonGlow) },
-    },
-    vertexShader: /* glsl */ `
-      varying vec3 vDir;
-      void main() {
-        vDir = normalize(position);
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }`,
-    fragmentShader: /* glsl */ `
-      uniform vec3 top, mid, horizon, glow;
-      varying vec3 vDir;
-      void main() {
-        float h = vDir.y;
-        vec3 c = mix(horizon, mid, smoothstep(0.0, 0.18, h));
-        c = mix(c, top, smoothstep(0.15, 0.6, h));
-        // Warm sunset glow, strongest straight ahead (the field direction is -z).
-        float ahead = max(0.0, -vDir.z);
-        c += glow * pow(1.0 - clamp(abs(h) * 5.0, 0.0, 1.0), 3.0) * (0.25 + 0.45 * ahead);
-        gl_FragColor = vec4(c, 1.0);
-      }`,
-  });
-  const sky = new THREE.Mesh(geo, mat);
-  sky.renderOrder = -1;
-  return sky;
-}
-
-function createStars(): THREE.Points {
-  const count = 900;
-  const pos = new Float32Array(count * 3);
-  for (let i = 0; i < count; i++) {
-    // Upper hemisphere only, denser higher up.
-    const theta = range(0, Math.PI * 2);
-    const y = Math.pow(rand(), 0.6) * 0.95 + 0.05;
-    const r = Math.sqrt(1 - y * y);
-    pos.set([Math.cos(theta) * r * 380, y * 380, Math.sin(theta) * r * 380], i * 3);
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  const mat = new THREE.PointsMaterial({
-    color: 0xffffff,
-    size: 1.6,
-    sizeAttenuation: false,
-    transparent: true,
-    opacity: 0.85,
-    fog: false,
-    depthWrite: false,
-  });
-  return new THREE.Points(geo, mat);
-}
-
-function createMoon(): THREE.Group {
-  const g = new THREE.Group();
-  const moon = new THREE.Mesh(
-    new THREE.SphereGeometry(9, 32, 16),
-    new THREE.MeshBasicMaterial({ color: PALETTE.moon, fog: false }),
-  );
-  // Soft halo: a camera-facing sprite with a radial gradient texture.
-  const halo = new THREE.Sprite(
-    new THREE.SpriteMaterial({
-      map: radialTexture('rgba(255,236,200,0.35)', 'rgba(255,236,200,0)'),
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      fog: false,
-    }),
-  );
-  halo.scale.set(80, 80, 1);
-  g.add(halo, moon);
-  g.position.set(-55, 62, -280);
-  return g;
-}
-
-function createMountains(): THREE.Mesh[] {
-  // Three jagged silhouette layers, further = lighter (aerial perspective).
-  const layers = [
-    { z: -140, height: 34, color: 0x3a2b5e, jag: 10 },
-    { z: -110, height: 24, color: 0x2a2048, jag: 8 },
-    { z: -85, height: 15, color: 0x1c1735, jag: 6 },
-  ];
-  return layers.map((l) => {
-    const shape = new THREE.Shape();
-    const width = 420;
-    shape.moveTo(-width / 2, -10);
-    for (let x = -width / 2; x <= width / 2; x += range(8, 18)) {
-      const peak = l.height * (0.45 + 0.55 * Math.abs(Math.sin(x * 0.013 + l.z))) + range(-l.jag, l.jag) * 0.5;
-      shape.lineTo(x, Math.max(2, peak));
-    }
-    shape.lineTo(width / 2, -10);
-    const mesh = new THREE.Mesh(
-      new THREE.ShapeGeometry(shape),
-      new THREE.MeshBasicMaterial({ color: l.color, fog: false }),
-    );
-    mesh.position.z = l.z;
-    return mesh;
-  });
-}
-
 // ---------------------------------------------------------------- ground
 
 function createGround(): THREE.Mesh {
   // One big subdivided plane: flat dirt road down the middle (where enemies walk),
-  // rolling grass hills on the sides. Colours vary per vertex for a hand-painted look.
-  const geo = new THREE.PlaneGeometry(220, 160, 110, 80);
+  // rolling grass hills on the sides, the river bed on the right (terrain.ts).
+  // Colours vary per vertex for a hand-painted look.
+  const geo = new THREE.PlaneGeometry(300, 230, 150, 115);
   geo.rotateX(-Math.PI / 2);
-  geo.translate(0, 0, -60);
+  geo.translate(0, 0, -90);
   const pos = geo.attributes.position as THREE.BufferAttribute;
   const colors = new Float32Array(pos.count * 3);
   const grass = new THREE.Color(PALETTE.grass);
@@ -185,22 +68,18 @@ function createGround(): THREE.Mesh {
   const road = new THREE.Color(PALETTE.road);
   const roadDark = new THREE.Color(PALETTE.roadDark);
   const c = new THREE.Color();
-  const roadHalf = CONFIG.FIELD.halfWidth + 1.5;
+  const bank = new THREE.Color(0x6b6a4a); // muddy river banks
+  const w = CONFIG.SCENERY.riverWidth;
 
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);
     const z = pos.getZ(i);
-    // Road edge wobbles a little so it doesn't look ruler-straight.
-    const edge = roadHalf + Math.sin(z * 0.2) * 0.8;
-    const roadAmount = 1 - THREE.MathUtils.smoothstep(Math.abs(x), edge - 1.5, edge + 1.5);
+    pos.setY(i, groundHeight(x, z));
     const n = noise2(x, z);
-    // Hills rise away from the road.
-    const hill = Math.max(0, Math.abs(x) - edge) * 0.08 * (1.5 + n);
-    pos.setY(i, hill * (1 - roadAmount) + n * 0.15);
-
     c.copy(grassDark).lerp(grass, 0.5 + n * 0.5);
     const r = c.clone().copy(roadDark).lerp(road, 0.5 + noise2(x * 3, z * 3) * 0.5);
-    c.lerp(r, roadAmount);
+    c.lerp(r, roadAmount(x, z));
+    c.lerp(bank, 1 - THREE.MathUtils.smoothstep(nearestRiver(x, z).dist, w * 0.6, w * 1.6));
     // A little random speckle.
     const s = 0.92 + rand() * 0.12;
     colors.set([c.r * s, c.g * s, c.b * s], i * 3);
@@ -218,7 +97,7 @@ function createGround(): THREE.Mesh {
 function createForest(): THREE.Group {
   // Low-poly pines on both sides of the road, instanced (one draw call per part).
   const g = new THREE.Group();
-  const count = 260;
+  const count = 380;
   const trunkGeo = new THREE.CylinderGeometry(0.15, 0.22, 1.2, 5);
   const crownGeo = new THREE.ConeGeometry(1.2, 3.2, 6);
   const trunk = new THREE.InstancedMesh(trunkGeo, toon({ color: PALETTE.wood, flatShading: true }), count);
@@ -229,24 +108,31 @@ function createForest(): THREE.Group {
   const col = new THREE.Color();
   const minX = CONFIG.FIELD.halfWidth + 4;
 
-  for (let i = 0; i < count; i++) {
+  const clear = (x: number, z: number) =>
+    nearestRiver(x, z).dist > CONFIG.SCENERY.riverWidth * 1.4 + 1.2 &&
+    CONFIG.SCENERY.siegeTowers.every(([tx, tz]) => Math.hypot(x - tx, z - tz) > 4.5) &&
+    Math.abs(z - CONFIG.SCENERY.bridgeZ) > 3;
+  let placed = 0;
+  for (let i = 0; placed < count && i < count * 4; i++) {
     const side = i % 2 === 0 ? -1 : 1;
-    const x = side * range(minX, minX + 45);
-    const z = range(-95, -2);
+    const x = side * range(minX, minX + 55);
+    const z = range(-150, -2);
     const s = range(0.8, 1.9);
-    const n = noise2(x, z);
-    const y = Math.max(0, Math.abs(x) - (CONFIG.FIELD.halfWidth + 1.5)) * 0.08 * (1.5 + n) + n * 0.15;
+    if (!clear(x, z)) continue;
+    const y = groundHeight(x, z);
     q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), range(0, Math.PI * 2));
     m.compose(new THREE.Vector3(x, y + 0.6 * s, z), q, new THREE.Vector3(s, s, s));
-    trunk.setMatrixAt(i, m);
+    trunk.setMatrixAt(placed, m);
     m.compose(new THREE.Vector3(x, y + 2.4 * s, z), q, new THREE.Vector3(s, s, s));
-    crownA.setMatrixAt(i, m);
+    crownA.setMatrixAt(placed, m);
     m.compose(new THREE.Vector3(x, y + 3.6 * s, z), q, new THREE.Vector3(s * 0.75, s * 0.8, s * 0.75));
-    crownB.setMatrixAt(i, m);
+    crownB.setMatrixAt(placed, m);
     col.set(PALETTE.pine).lerp(new THREE.Color(PALETTE.pineDark), rand());
-    crownA.setColorAt(i, col);
-    crownB.setColorAt(i, col.multiplyScalar(1.15));
+    crownA.setColorAt(placed, col);
+    crownB.setColorAt(placed, col.multiplyScalar(1.15));
+    placed++;
   }
+  trunk.count = crownA.count = crownB.count = placed;
   g.add(trunk, crownA, crownB);
   return g;
 }
@@ -267,7 +153,7 @@ function createRocks(): THREE.InstancedMesh {
     const z = range(-70, -6);
     const s = range(0.4, 1.6);
     q.setFromEuler(new THREE.Euler(rand() * 3, rand() * 3, rand() * 3));
-    m.compose(new THREE.Vector3(x, 0.15 * s, z), q, new THREE.Vector3(s, s * 0.7, s));
+    m.compose(new THREE.Vector3(x, groundHeight(x, z) + 0.15 * s, z), q, new THREE.Vector3(s, s * 0.7, s));
     rocks.setMatrixAt(i, m);
   }
   return rocks;
@@ -456,7 +342,7 @@ function createTorch(x: number, y: number, z: number) {
 
 function createMist() {
   // Big soft sprites hugging the ground, drifting sideways: cheap "volumetric" mist.
-  const tex = radialTexture('rgba(190,180,255,0.55)', 'rgba(190,180,255,0)');
+  const tex = radialTexture('rgba(255,200,190,0.45)', 'rgba(255,200,190,0)');
   const sprites: THREE.Sprite[] = [];
   const base: Array<{ x: number; z: number; speed: number; phase: number }> = [];
   for (let i = 0; i < CONFIG.MIST_SPRITES; i++) {

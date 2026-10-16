@@ -198,13 +198,30 @@ export const CONFIG = {
   AUTO_QUALITY: { enabled: true, minFps: 45, seconds: 2.5 },
   /** Soft mist sprites over the field (big transparent sprites cost fill rate). */
   MIST_SPRITES: 8,
-  /** Night look: sky fill light, moonlight, fog density. Raise ambient/moon if the demo screen is too dark. */
-  NIGHT: { ambient: 1.1, moon: 2.2, fog: 0.017 },
+  /** Sunset look: sky fill light, warm key light from behind the castle, orange sun rim light
+   *  from behind the monsters (the sun), fog density. Raise ambient/key if the screen is too dark. */
+  SUNSET: { ambient: 1.3, key: 2.0, rim: 2.2, fog: 0.0052 },
+  /** The sunset valley around the field (render only, world units; the field runs from z -4 to -42).
+   *  sun = where the sun sits, far behind the mountains (the sky glow and the orange rim light follow it).
+   *  river = points (x, z) the river flows through, from the waterfalls by the castle to the right edge.
+   *  bridgeZ / bridgeX = the long stone arch bridge across the valley, behind the rift.
+   *  castle = the castle on a cliff, far away on the right. siegeTowers = wooden enemy towers (x, z).
+   *  fenceZ = the road fences run between these z values. */
+  SCENERY: {
+    sun: { x: -110, y: 26, z: -330 },
+    river: [[62, -186], [50, -162], [38, -136], [29, -113], [25, -92], [28, -74], [23, -56], [26, -38], [32, -22], [42, -8], [62, 4]] as Array<[number, number]>,
+    riverWidth: 4.5,
+    bridgeZ: -104,
+    bridgeX: [-62, 48] as [number, number],
+    castle: { x: 84, z: -196 },
+    siegeTowers: [[-17, -22], [16, -31], [-20, -50], [17, -61]] as Array<[number, number]>,
+    fenceZ: [-9, -44] as [number, number],
+  },
   /** Castle towers: sideways distance from the centre and how far they stick out from the wall
    *  (they frame the screen edges). riftScale = size of the monster rift at the end of the road. */
   LANDMARKS: { towerX: 10, towerForward: 4.5, riftScale: 0.7 },
   /** Third-person camera behind and above the wizard (CoC-style).
    *  height / back = camera position above the walkway and behind the wall's front face;
    *  x = sideways offset (over the shoulder). wizardX/wizardBack = where the wizard stands. */
-  CAMERA: { fov: 60, height: 6.2, back: 6.5, x: 0.6, lookAtY: 3.5, lookAtZ: -18, wizardX: -0.7, wizardBack: 1.1, crenelHalfWidth: 1.35 },
+  CAMERA: { fov: 60, height: 6.2, back: 6.5, x: 0.6, lookAtY: 4.5, lookAtZ: -18, wizardX: -0.7, wizardBack: 1.1, crenelHalfWidth: 1.35 },
 };
