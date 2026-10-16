@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sigil Siege - monster showcase</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #0d0b24; }
+      canvas { display: block; width: 100%; height: 100%; }
+      #labels { position: fixed; bottom: 18px; left: 0; right: 0; display: flex; justify-content: space-around;
+        font: 16px monospace; color: #F2C14E; pointer-events: none; }
+    </style>
+  </head>
+  <body>
+    <div id="labels"><span>IMP: flame wisp</span><span>BIRD: ghost horse</span><span>WARLOCK: skeleton archer</span><span>BOSS: horse rider</span></div>
+    <script type="module" src="/src/render/showcase.ts"></script>
+  </body>
+</html>

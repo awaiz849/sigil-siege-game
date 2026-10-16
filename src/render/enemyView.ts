@@ -19,6 +19,7 @@ type View = {
   hp: number;
   hitT: number; // 1 right after a hit, fades to 0
   stepT: number; // time to the next footstep dust puff
+  state: Enemy['state']; // last seen state (archer: charge -> recharge = arrow fired)
   last: Enemy; // last seen state (used for the death effect after removal)
   spawnT: number;
 };
@@ -28,7 +29,10 @@ type Dying = { model: EnemyModel; shadow: THREE.Mesh; t: number; crash: boolean 
 const SPAWN_TIME = 0.5;
 const DEATH_TIME = 0.4;
 
-export function createEnemyView(scene: THREE.Scene, particles: Particles) {
+/** Called when a skeleton archer looses its arrow at the castle (from = arrow tip). */
+export type ShotHandler = (from: THREE.Vector3, enemy: Enemy) => void;
+
+export function createEnemyView(scene: THREE.Scene, particles: Particles, onArcherShot: ShotHandler) {
   const views = new Map<number, View>();
   const dying: Dying[] = [];
 
@@ -60,7 +64,7 @@ export function createEnemyView(scene: THREE.Scene, particles: Particles) {
       if (m instanceof THREE.MeshStandardMaterial && m.emissiveIntensity < 1) flashMats.add(m);
     });
     const flash = [...flashMats].map((mat) => ({ mat, base: mat.emissive.clone(), baseIntensity: mat.emissiveIntensity }));
-    views.set(enemy.id, { model, shadow, stunStars, element: enemy.element, flashMats: flash, hp: enemy.hp, hitT: 0, stepT: 0, last: { ...enemy, pos: { ...enemy.pos } }, spawnT: t });
+    views.set(enemy.id, { model, shadow, stunStars, element: enemy.element, flashMats: flash, hp: enemy.hp, hitT: 0, stepT: 0, state: enemy.state, last: { ...enemy, pos: { ...enemy.pos } }, spawnT: t });
     // Puff of dust where it appears.
     particles.burst(new THREE.Vector3(enemy.pos.x, 0.4, enemy.pos.z), 0x8a7a9a, 12, 2.5, 1, 0.6);
   }
@@ -130,8 +134,14 @@ export function createEnemyView(scene: THREE.Scene, particles: Particles) {
         g.position.z -= view.hitT * 0.35;
         g.rotation.x = -view.hitT * 0.25;
 
-        // Footstep dust for walking golems (bigger, slower stomps for the boss).
-        if ((enemy.type === 'imp' || enemy.type === 'boss') && enemy.state === 'walk' && enemy.stunT <= 0) {
+        // Archer: charge finished -> the arrow flies at the castle.
+        if (view.state === 'charge' && enemy.state === 'recharge' && enemy.stunT <= 0 && view.model.arrowTip) {
+          onArcherShot(view.model.arrowTip(new THREE.Vector3()), enemy);
+        }
+        view.state = enemy.state;
+
+        // Hoof stomps for the boss's horse.
+        if (enemy.type === 'boss' && enemy.state === 'walk' && enemy.stunT <= 0) {
           view.stepT -= dt;
           if (view.stepT <= 0) {
             const boss = enemy.type === 'boss';

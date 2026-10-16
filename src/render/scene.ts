@@ -11,7 +11,7 @@ import type { Enemy, World } from '../game/types.ts';
 import { createEnvironment, WALL_TOP } from './environment.ts';
 import { createEnemyView } from './enemyView.ts';
 import { createParticles } from './particles.ts';
-import { PALETTE } from './palette.ts';
+import { ELEMENT_COLOR, PALETTE } from './palette.ts';
 import { radialTexture } from './environment.ts';
 import { createWizard } from './wizard.ts';
 
@@ -56,7 +56,11 @@ export function createScene(canvas: HTMLCanvasElement) {
   let lightningT = 0;
   let sparkT = 0;
   const particles = createParticles(scene);
-  const enemies = createEnemyView(scene, particles);
+  // Archers shoot a glowing arrow at the wall when their charge completes.
+  const enemies = createEnemyView(scene, particles, (from, enemy) => {
+    const to = new THREE.Vector3(enemy.pos.x * 0.4, WALL_TOP + 0.8, CONFIG.FIELD.wallZ + 0.3);
+    fire(from, to, ELEMENT_COLOR[enemy.element], () => particles.burst(to, 0xff5030, 25, 4, 1, 0.6));
+  });
 
   // Bloom makes emissive things (eyes, orbs, torches, moon) glow.
   // Multisampled render target: without it the post-processing path loses anti-aliasing (jagged edges).
@@ -92,6 +96,15 @@ export function createScene(canvas: HTMLCanvasElement) {
     }
   }
   const orbTexture = radialTexture('rgba(255,255,255,1)', 'rgba(255,255,255,0)');
+
+  /** Launch an orb from -> to; onArrive runs when it lands. */
+  function fire(from: THREE.Vector3, to: THREE.Vector3, color: number, onArrive: () => void) {
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: orbTexture, color, blending: THREE.AdditiveBlending, depthWrite: false }));
+    sprite.scale.setScalar(1.3);
+    sprite.position.copy(from);
+    scene.add(sprite);
+    shots.push({ sprite, from, to, t: 0, color, onArrive });
+  }
 
   function updateShots(dt: number) {
     for (let i = shots.length - 1; i >= 0; i--) {
@@ -213,13 +226,7 @@ export function createScene(canvas: HTMLCanvasElement) {
     castProjectile(pos: { x: number; y: number; z: number }, enemyId: number, color: number, onArrive: () => void) {
       const from = wizard.orbWorldPosition(new THREE.Vector3());
       const to = new THREE.Vector3(pos.x, pos.y + enemies.heightOf(enemyId) * 0.5, pos.z);
-      const sprite = new THREE.Sprite(
-        new THREE.SpriteMaterial({ map: orbTexture, color, blending: THREE.AdditiveBlending, depthWrite: false }),
-      );
-      sprite.scale.setScalar(1.3);
-      sprite.position.copy(from);
-      scene.add(sprite);
-      shots.push({ sprite, from, to, t: 0, color, onArrive });
+      fire(from, to, color, onArrive);
     },
     /** The wizard casts: arms thrust forward, orb flashes in the spell colour. */
     wizardCast(color: number) {
