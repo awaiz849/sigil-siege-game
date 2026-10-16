@@ -126,7 +126,7 @@ export interface World {
   /** Events since the last takeEvents() call (from update() and from spells). */
   events: GameEvent[];
   /** Totals for tests and the end screen. */
-  stats: { spawned: Record<EnemyType, number>; kills: number };
+  stats: { spawned: Record<EnemyType, number>; kills: number; perfects: number };
   /** Tuning log for this round (roundLog.ts). */
   log: RoundLog;
 }

@@ -74,7 +74,7 @@ export function formatRoundLog(world: World): string {
     `ROUND LOG ${log.difficulty}: ${world.phase} at ${world.time.toFixed(1)} s, score ${world.score}, castle ${world.castleHp}/${CONFIG.DIFFICULTY[log.difficulty].castleHp}`,
     `strokes: ${log.strokes.length}, pen down -> cast avg ${avg(times).toFixed(2)} s, slowest ${Math.max(0, ...times).toFixed(2)} s`,
     `results: ${Object.entries(counts).map(([k, n]) => `${k} ${n}`).join(', ') || 'none'}`,
-    `kills: ${world.stats.kills} (per wave ${log.killsByWave.join(' / ')})`,
+    `kills: ${world.stats.kills} (per wave ${log.killsByWave.join(' / ')}), perfect sigils: ${world.stats.perfects}`,
     `castle damage per wave: ${log.damageByWave.join(' / ')}`,
     `enemies on field per second: avg ${avg(perSecond).toFixed(1)}, max ${Math.max(0, ...perSecond)} (cap ${CONFIG.DIFFICULTY[log.difficulty].maxEnemies})`,
     ...rows,

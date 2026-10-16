@@ -40,7 +40,7 @@ export function createWorld(difficulty: Difficulty = 'normal', seed: number = Da
     },
     rng: seed >>> 0,
     events: [],
-    stats: { spawned: { imp: 0, bird: 0, warlock: 0, boss: 0 }, kills: 0 },
+    stats: { spawned: { imp: 0, bird: 0, warlock: 0, boss: 0 }, kills: 0, perfects: 0 },
     log: createRoundLog(difficulty),
   };
 }

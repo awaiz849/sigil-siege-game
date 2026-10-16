@@ -48,6 +48,9 @@ export const CONFIG = {
 
   // ---- Recognizer ----
   RECOGNIZER_THRESHOLD: 0.8,
+  /** PERFECT SIGIL: a shape drawn this cleanly (recognizer score >= minScore) earns bonus points and
+   *  mana, but only when the spell actually does something (hit, kill, push or block). */
+  PERFECT_SIGIL: { minScore: 0.92, bonus: 50, mana: 8 },
   /** Precheck: end-to-end distance / path length at or above this = line. */
   LINE_STRAIGHTNESS: 0.95,
   /** Precheck: end gap below this fraction of the bounding-box diagonal = closed shape. */

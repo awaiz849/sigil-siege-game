@@ -131,7 +131,8 @@ onStrokeEnd((points) => {
   if (debugOverlay.isVisible()) overlay.showDebugLabel(`${shape.name ?? 'no match'} ${shape.score.toFixed(2)}`, centre.x, centre.y);
   if (screens.current === 'tutorial') return screens.tutorialStroke(shape.name); // practice the shapes
   if (world.phase !== 'PLAYING' || screens.current) return; // other menus: strokes do nothing
-  const result = castSpell(world, shape.name, centre, world3d.project);
+  // shape.score = how cleanly it was drawn: a very clean shape earns the PERFECT SIGIL bonus.
+  const result = castSpell(world, shape.name, centre, world3d.project, shape.score);
   overlay.worldUi.burnStroke(result, performance.now());
   showCast(result, centre);
 });

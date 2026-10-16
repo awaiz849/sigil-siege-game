@@ -448,5 +448,64 @@ check('castle HP hard 100', createWorld('hard').castleHp === 100);
   check('report has the lines', report.includes('pen down -> cast avg 1.50 s') && report.includes('castle damage per wave'), report);
 }
 
+// ---- PERFECT SIGIL: a cleanly drawn shape that works earns bonus points + mana ----
+{
+  const P = CONFIG.PERFECT_SIGIL;
+  const M = CONFIG.MANA;
+  const clean = P.minScore; // exactly at the threshold counts
+  const sloppy = P.minScore - 0.01;
+
+  // Clean hit: bonus points, bonus mana, text, counted.
+  const w = fresh();
+  const boss = spawnEnemy(w, 'boss', 'nature', 0); // 8 HP: a hit, not a kill
+  const r = castSpell(w, 'v', fakeProject(boss), fakeProject, clean);
+  check('perfect hit flagged', r.kind === 'hit' && r.perfect);
+  check('perfect bonus points', w.score === P.bonus && r.scoreGained === P.bonus, `score ${w.score}`);
+  check('perfect bonus mana', w.mana === M.max - M.cost.nature + P.mana, `mana ${w.mana}`);
+  check('perfect text', r.texts.some((t) => t.text === TEXT.perfect(P.bonus)));
+  check('perfect counted', w.stats.perfects === 1);
+
+  // Same cast, drawn a bit sloppier: no bonus.
+  const s2 = fresh();
+  const b2 = spawnEnemy(s2, 'boss', 'nature', 0);
+  const r2 = castSpell(s2, 'v', fakeProject(b2), fakeProject, sloppy);
+  check('below threshold: no bonus', !r2.perfect && s2.score === 0 && s2.mana === M.max - M.cost.nature);
+
+  // Bonus mana never goes over the max.
+  const full = fresh();
+  const imp = spawnEnemy(full, 'imp', 'fire', 0);
+  full.mana = M.max;
+  castSpell(full, 'C', fakeProject(imp), fakeProject, 1); // water beats fire: refund + perfect
+  check('perfect mana capped at max', full.mana === M.max, `mana ${full.mana}`);
+
+  // Kill: kill score + perfect bonus together.
+  const k = fresh();
+  const bird = spawnEnemy(k, 'bird', 'nature', 0); // 1 HP
+  const rk = castSpell(k, 'L', fakeProject(bird), fakeProject, 1);
+  check('perfect kill adds both', rk.kind === 'kill' && rk.scoreGained === CONFIG.KILL_SCORE + P.bonus && k.score === CONFIG.KILL_SCORE + P.bonus);
+
+  // No farming: a perfect shape that does nothing earns nothing.
+  const empty = fresh();
+  check('perfect miss: no bonus', !castSpell(empty, 'v', { x: 0, y: 0 }, fakeProject, 1).perfect && empty.score === 0);
+  const cd = fresh();
+  spawnEnemy(cd, 'imp', 'fire', 0);
+  cd.lightningCooldown = 5;
+  check('perfect on cooldown: no bonus', !castSpell(cd, 'zigzag', { x: 0, y: 0 }, fakeProject, 1).perfect && cd.score === 0);
+  const broke = fresh();
+  const i3 = spawnEnemy(broke, 'imp', 'fire', 0);
+  broke.mana = 0;
+  check('perfect with no mana: no bonus', castSpell(broke, 'C', fakeProject(i3), fakeProject, 1).kind === 'nomana' && broke.score === 0);
+
+  // Wind push counts as "did something".
+  const wd = fresh();
+  spawnEnemy(wd, 'imp', 'fire', 0);
+  check('perfect wind push', castSpell(wd, 'line', { x: 0, y: 0 }, fakeProject, 1).perfect && wd.score === P.bonus);
+
+  // Old callers without a quality argument never get the bonus.
+  const old = fresh();
+  const i4 = spawnEnemy(old, 'imp', 'fire', 0);
+  check('no quality given: no bonus', !castSpell(old, 'C', fakeProject(i4), fakeProject).perfect);
+}
+
 if (failures > 0) throw new Error(`${failures} rule checks failed (${passes} passed)`);
 console.log(`ALL ${passes} rule checks passed`);

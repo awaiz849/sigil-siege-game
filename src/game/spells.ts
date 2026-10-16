@@ -31,6 +31,7 @@ export const TEXT = {
   blocked: 'BLOCKED!',
   wind: 'WIND!',
   noMana: 'NO MANA',
+  perfect: (bonus: number) => `PERFECT SIGIL! +${bonus}`,
   cooldown: (spell: SpellName, seconds: number) => `${spell.toUpperCase()} ${Math.ceil(seconds)}s`,
   kill: (score: number) => `+${score}`,
 };
@@ -72,6 +73,8 @@ export interface SpellResult {
   cooldownLeft: number;
   /** The floating texts this cast produced (also pushed to world.events as 'floatText'). */
   texts: FloatText[];
+  /** The shape was drawn cleanly enough for the PERFECT SIGIL bonus (see CONFIG.PERFECT_SIGIL). */
+  perfect: boolean;
 }
 
 /**
@@ -98,17 +101,42 @@ export function pickTarget(world: World, strokeCentre: ScreenPoint, project: Pro
  * @param shape        recognizer name (line | v | zigzag | C | L), or null if not recognized
  * @param strokeCentre centre of the stroke in overlay pixels: picks the target
  * @param project      renderer's enemy -> screen position function
+ * @param quality      recognizer score 0..1 (how cleanly it was drawn), for the PERFECT SIGIL bonus
  */
-export function castSpell(world: World, shape: string | null, strokeCentre: ScreenPoint, project: ProjectFn): SpellResult {
-  return castSpellOn(world, shape, pickTarget(world, strokeCentre, project));
+export function castSpell(
+  world: World,
+  shape: string | null,
+  strokeCentre: ScreenPoint,
+  project: ProjectFn,
+  quality = 0,
+): SpellResult {
+  return castSpellOn(world, shape, pickTarget(world, strokeCentre, project), quality);
 }
 
 /** Same as castSpell, but with the target already chosen (enemy id, or null = no target). */
-export function castSpellOn(world: World, shape: string | null, targetId: number | null): SpellResult {
+export function castSpellOn(world: World, shape: string | null, targetId: number | null, quality = 0): SpellResult {
   if (world.phase !== 'PLAYING') return result(world, 'ignored', null);
   const r = castShape(world, shape, targetId);
+  if (quality >= CONFIG.PERFECT_SIGIL.minScore) rewardPerfect(world, r);
   logCast(world, shape, r.kind); // tuning log: pen down -> cast time
   return r;
+}
+
+/** Spells that did something: only these can earn the PERFECT SIGIL bonus (no farming on misses). */
+const EFFECTIVE_KINDS: SpellResult['kind'][] = ['hit', 'kill', 'push', 'block'];
+
+/** PERFECT SIGIL: a cleanly drawn shape that worked earns bonus points and mana. */
+function rewardPerfect(world: World, r: SpellResult): void {
+  if (!EFFECTIVE_KINDS.includes(r.kind)) return;
+  const { bonus, mana } = CONFIG.PERFECT_SIGIL;
+  world.score += bonus;
+  world.mana = Math.min(CONFIG.MANA.max, world.mana + mana);
+  world.stats.perfects++;
+  r.perfect = true;
+  r.scoreGained += bonus;
+  const text: FloatText = { text: TEXT.perfect(bonus), pos: null, tone: 'great' };
+  r.texts.push(text);
+  world.events.push({ type: 'floatText', ...text });
 }
 
 function castShape(world: World, shape: string | null, targetId: number | null): SpellResult {
@@ -250,5 +278,5 @@ function result(
   texts: FloatText[] = [],
 ): SpellResult {
   for (const t of texts) world.events.push({ type: 'floatText', ...t });
-  return { kind, spell, hits: [], blockedIds: [], pushedIds: [], scoreGained: 0, combo: world.combo, cooldownLeft: 0, texts, ...extra };
+  return { kind, spell, hits: [], blockedIds: [], pushedIds: [], scoreGained: 0, combo: world.combo, cooldownLeft: 0, texts, perfect: false, ...extra };
 }
