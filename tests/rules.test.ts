@@ -300,8 +300,10 @@ check('castle HP hard 100', createWorld('hard').castleHp === 100);
 {
   const w = fresh();
   const boss = spawnEnemy(w, 'boss', 'fire', 0);
+  const minion = spawnEnemy(w, 'imp', 'water', 6);
   boss.hp = 1;
   cast(w, 'v', boss);
+  check('boss down: every other monster vanishes', !w.enemies.includes(minion) && w.enemies.length === 0 && w.events.some((e) => e.type === 'vanish' && e.enemyId === minion.id));
   update(w, 0.01);
   check('killing the boss wins', w.phase === 'WIN' && w.events.some((e) => e.type === 'gameOver'));
   check('cast after game over ignored', cast(w, 'C', null).kind === 'ignored');

@@ -84,6 +84,8 @@ export interface FloatText {
 export type GameEvent =
   | { type: 'waveStart'; wave: number }
   | { type: 'burn'; enemyId: number; pos: Vec3; killed: boolean }
+  /** The boss fell, so this monster vanished with it. */
+  | { type: 'vanish'; enemyId: number; pos: Vec3 }
   | { type: 'cleanWave'; wave: number; bonus: number }
   | { type: 'spawn'; enemyId: number; enemyType: EnemyType }
   | { type: 'castleHit'; enemyId: number; damage: number; cause: 'wall' | 'blast' }

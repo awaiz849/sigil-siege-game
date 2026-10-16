@@ -401,8 +401,15 @@ function damageEnemy(world: World, enemy: Enemy, spellElement: Element | null, b
     world.stats.kills++;
     world.log.killsByWave[world.wave - 1]++;
     if (chargesUltimate) chargeUltimate(world, CONFIG.METEOR.perKill);
-    if (enemy.type === 'boss') world.bossDefeated = true; // update() ends the round
     removeEnemy(world, enemy.id);
+    if (enemy.type === 'boss') {
+      world.bossDefeated = true; // update() ends the round
+      // The boss falls: every other monster vanishes with it (no score, just a puff of magic).
+      for (const e of world.enemies.slice()) {
+        world.events.push({ type: 'vanish', enemyId: e.id, pos: { ...e.pos } });
+        removeEnemy(world, e.id);
+      }
+    }
   }
   return hit;
 }
