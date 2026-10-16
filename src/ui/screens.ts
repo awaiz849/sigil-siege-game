@@ -153,8 +153,8 @@ export function createScreens(opts: Opts) {
 
     draw(ctx: CanvasRenderingContext2D, now: number) {
       if (!screen) return;
-      W = ctx.canvas.width;
-      H = ctx.canvas.height;
+      W = ctx.canvas.clientWidth;
+      H = ctx.canvas.clientHeight;
       const s = scale();
       const fade = Math.min(1, (now - shownAt) / 300);
       ctx.save();

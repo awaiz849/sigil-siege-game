@@ -14,6 +14,10 @@ type View = {
   shadow: THREE.Mesh;
   stunStars: THREE.Group;
   element: Enemy['element'];
+  /** Non-glowing materials: flashed white when the enemy is hit. */
+  flashMats: THREE.MeshStandardMaterial[];
+  hp: number;
+  hitT: number; // 1 right after a hit, fades to 0
   last: Enemy; // last seen state (used for the death effect after removal)
   spawnT: number;
 };
@@ -49,7 +53,12 @@ export function createEnemyView(scene: THREE.Scene, particles: Particles) {
     stunStars.visible = false;
     model.group.add(stunStars);
     scene.add(model.group, shadow);
-    views.set(enemy.id, { model, shadow, stunStars, element: enemy.element, last: { ...enemy, pos: { ...enemy.pos } }, spawnT: t });
+    const flashMats = new Set<THREE.MeshStandardMaterial>();
+    model.group.traverse((o) => {
+      const m = (o as THREE.Mesh).material;
+      if (m instanceof THREE.MeshStandardMaterial && m.emissive.getHex() === 0) flashMats.add(m);
+    });
+    views.set(enemy.id, { model, shadow, stunStars, element: enemy.element, flashMats: [...flashMats], hp: enemy.hp, hitT: 0, last: { ...enemy, pos: { ...enemy.pos } }, spawnT: t });
     // Puff of dust where it appears.
     particles.burst(new THREE.Vector3(enemy.pos.x, 0.4, enemy.pos.z), 0x8a7a9a, 12, 2.5, 1, 0.6);
   }
@@ -100,6 +109,14 @@ export function createEnemyView(scene: THREE.Scene, particles: Particles) {
         view.stunStars.visible = enemy.stunT > 0;
         view.stunStars.rotation.y = t * 4;
         g.rotation.z = enemy.stunT > 0 ? Math.sin(t * 6) * 0.08 : 0;
+
+        // Hit: white flash + a little stagger backwards.
+        if (enemy.hp < view.hp) view.hitT = 1;
+        view.hp = enemy.hp;
+        view.hitT = Math.max(0, view.hitT - dt * 4);
+        for (const m of view.flashMats) m.emissive.setScalar(view.hitT * 0.9);
+        g.position.z -= view.hitT * 0.35;
+        g.rotation.x = -view.hitT * 0.25;
 
         view.model.animate(enemy, t, dt);
       }

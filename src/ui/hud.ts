@@ -13,8 +13,8 @@ const PANEL = 'rgba(13, 11, 36, 0.72)';
 const BORDER = 'rgba(242, 193, 78, 0.55)';
 
 export function drawHud(ctx: CanvasRenderingContext2D, world: World, now: number) {
-  const w = ctx.canvas.width;
-  const h = ctx.canvas.height;
+  const w = ctx.canvas.clientWidth;
+  const h = ctx.canvas.clientHeight;
   // Scale everything with the window (designed at 1280x720).
   const s = Math.max(0.7, Math.min(1.6, Math.min(w / 1280, h / 720)));
   ctx.save();

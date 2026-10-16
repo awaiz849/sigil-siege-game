@@ -3,6 +3,7 @@
 //   fixed HUD (castle HP, timer, score, spellbook)               -> hud.ts
 //   the glowing stroke trail                                      -> trail.ts
 //   the cursor, plus debug labels (mouse mode, recorder, recognizer result)
+import { CONFIG } from '../config.ts';
 import { onCursor, type Pose } from '../events.ts';
 import type { World } from '../game/types.ts';
 import { FONT_TITLE } from './fonts.ts';
@@ -24,16 +25,22 @@ export function createOverlay(canvas: HTMLCanvasElement) {
 
   onCursor((x, y, pose) => (cursor = { x, y, pose }));
 
+  // Draw at the screen's real pixel density (crisp text on high-DPI laptops). All drawing code
+  // works in CSS pixels: we scale the context, and sizes come from canvas.clientWidth/Height.
+  let dpr = 1;
   function resize(width: number, height: number) {
-    canvas.width = width;
-    canvas.height = height;
+    dpr = Math.min(window.devicePixelRatio || 1, CONFIG.OVERLAY_MAX_PIXEL_RATIO);
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
   }
 
   /** Draw one frame. world = null hides the HUD (menus). menu = screen layer drawn under the cursor. */
   function draw(world: World | null, view: View | null, now: number, menu: ((ctx: CanvasRenderingContext2D) => void) | null = null) {
-    const w = canvas.width;
-    const h = canvas.height;
-    ctx.clearRect(0, 0, w, h);
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     if (world && view) {
       worldUi.draw(ctx, world, view, now);

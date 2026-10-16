@@ -19,6 +19,16 @@ type Floating = FloatText & { born: number; at: Point | null };
 type Banner = { text: string; sub: string; color: string; born: number };
 type Bolt = { points: Point[]; born: number };
 
+/** Colour of each spell's sigil flare. */
+const SPELL_CSS: Record<string, string> = {
+  water: '#3fa9ff',
+  fire: '#ff5a2e',
+  nature: '#6fe05a',
+  lightning: '#cfe6ff',
+  wind: '#e8f6ff',
+  shield: '#9fe6ff',
+};
+
 const TONE_COLOR: Record<FloatText['tone'], string> = {
   great: GOLD,
   good: '#9fe6ff',
@@ -37,6 +47,8 @@ export function createWorldUi() {
   let shieldAt = -Infinity;
   let lightningFlashAt = -Infinity;
   let windAt = -Infinity;
+  let lastStroke: Point[] = [];
+  let burn: { points: Point[]; color: string; born: number; fizzle: boolean } | null = null;
 
   onStrokeStart(() => {
     stroke = [];
@@ -45,6 +57,7 @@ export function createWorldUi() {
   onStrokePoint((x, y) => stroke.push({ x, y }));
   onStrokeEnd((points) => {
     drawing = false;
+    lastStroke = points;
     lastStrokeCentre = strokeCentre(points);
   });
 
@@ -79,6 +92,14 @@ export function createWorldUi() {
       }
     },
 
+    /** The sigil you just drew flares in the spell's colour (or crumbles on a fizzle). */
+    burnStroke(result: SpellResult, now: number) {
+      if (lastStroke.length < 2 || result.kind === 'ignored') return;
+      const fizzle = result.kind === 'fizzle';
+      const color = fizzle ? '#b06060' : SPELL_CSS[result.spell ?? ''] ?? '#ffffff';
+      burn = { points: lastStroke, color, born: now, fizzle };
+    },
+
     /** Visual extras for a cast (lightning bolts, shield flash). */
     handleCast(result: SpellResult, view: View, now: number) {
       if (result.spell === 'lightning' && result.kind !== 'cooldown' && result.hits.length > 0) {
@@ -93,8 +114,8 @@ export function createWorldUi() {
     },
 
     draw(ctx: CanvasRenderingContext2D, world: World, view: View, now: number) {
-      const w = ctx.canvas.width;
-      const h = ctx.canvas.height;
+      const w = ctx.canvas.clientWidth;
+      const h = ctx.canvas.clientHeight;
       const s = Math.max(0.7, Math.min(1.6, Math.min(w / 1280, h / 720)));
 
       // Draw far enemies first so near badges overlap them.
@@ -110,6 +131,7 @@ export function createWorldUi() {
       }
 
       for (const e of enemies) drawBadge(ctx, e, view, now, s);
+      drawBurn(ctx, now);
       drawFloating(ctx, view, now, s);
       drawBolts(ctx, now);
       drawFlashes(ctx, now, w, h);
@@ -272,6 +294,43 @@ export function createWorldUi() {
       ctx.strokeText(f.text, at.x, y);
       ctx.fillStyle = TONE_COLOR[f.tone];
       ctx.fillText(f.text, at.x, y);
+    }
+    ctx.restore();
+  }
+
+  function drawBurn(ctx: CanvasRenderingContext2D, now: number) {
+    if (!burn) return;
+    const age = (now - burn.born) / 450;
+    if (age >= 1) {
+      burn = null;
+      return;
+    }
+    const c = strokeCentre(burn.points)!;
+    const grow = burn.fizzle ? 1 - age * 0.15 : 1 + easeOut(age) * 0.25;
+    ctx.save();
+    ctx.globalCompositeOperation = burn.fizzle ? 'source-over' : 'lighter';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.translate(c.x, c.y);
+    ctx.scale(grow, grow);
+    ctx.translate(-c.x, -c.y);
+    for (const [width, alpha] of [
+      [26, 0.18],
+      [12, 0.45],
+      [4, 1],
+    ] as const) {
+      ctx.lineWidth = width;
+      ctx.strokeStyle = burn.color;
+      ctx.globalAlpha = alpha * (1 - age);
+      ctx.beginPath();
+      burn.points.forEach((p, k) => {
+        // Fizzle: the stroke shakes apart.
+        const jx = burn!.fizzle ? (Math.random() - 0.5) * 12 * age : 0;
+        const jy = burn!.fizzle ? age * age * 40 : 0;
+        if (k === 0) ctx.moveTo(p.x + jx, p.y + jy);
+        else ctx.lineTo(p.x + jx, p.y + jy);
+      });
+      ctx.stroke();
     }
     ctx.restore();
   }

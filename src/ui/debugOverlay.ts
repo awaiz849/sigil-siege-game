@@ -27,8 +27,8 @@ export function createDebugOverlay() {
     if (!visible) return;
     const w = 320;
     const h = 240;
-    const x0 = ctx.canvas.width - w - 12;
-    const y0 = ctx.canvas.height - h - 12;
+    const x0 = ctx.canvas.clientWidth - w - 12;
+    const y0 = ctx.canvas.clientHeight - h - 12;
 
     ctx.save();
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';

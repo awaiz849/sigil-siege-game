@@ -38,6 +38,9 @@ export function createEnvironment(scene: THREE.Scene) {
   const wall = createWall();
   scene.add(wall.group);
   updaters.push(wall.update);
+  const mist = createMist();
+  mist.sprites.forEach((m) => scene.add(m));
+  updaters.push(mist.update);
   const fireflies = createFireflies();
   scene.add(fireflies.points);
   updaters.push(fireflies.update);
@@ -414,6 +417,34 @@ function createTorch(x: number, y: number, z: number) {
         f.position.set(Math.sin(phase) * 0.04, 0.55 + k * 0.16 + Math.sin(phase * 1.3) * 0.03, 0);
         const s = (0.75 - k * 0.18) * flicker;
         f.scale.set(s * 0.8, s * 1.2, 1);
+      });
+    },
+  };
+}
+
+// ---------------------------------------------------------------- mist
+
+function createMist() {
+  // Big soft sprites hugging the ground, drifting sideways: cheap "volumetric" mist.
+  const tex = radialTexture('rgba(190,180,255,0.55)', 'rgba(190,180,255,0)');
+  const sprites: THREE.Sprite[] = [];
+  const base: Array<{ x: number; z: number; speed: number; phase: number }> = [];
+  for (let i = 0; i < 18; i++) {
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.16, depthWrite: false }));
+    const z = range(-75, -9);
+    s.scale.set(range(18, 30), range(4, 7), 1);
+    s.position.set(range(-25, 25), range(0.6, 1.6), z);
+    sprites.push(s);
+    base.push({ x: s.position.x, z, speed: range(0.2, 0.6), phase: range(0, 6) });
+  }
+  return {
+    sprites,
+    update(t: number) {
+      sprites.forEach((s, i) => {
+        const b = base[i];
+        // Drift right and wrap around, with a slow breathing opacity.
+        s.position.x = ((b.x + t * b.speed + 30) % 60) - 30;
+        (s.material as THREE.SpriteMaterial).opacity = 0.12 + Math.sin(t * 0.3 + b.phase) * 0.05;
       });
     },
   };

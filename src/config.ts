@@ -133,6 +133,12 @@ export const CONFIG = {
   // ---- Rendering ----
   /** Cap on devicePixelRatio; lower it if 3D stutters with tracking. */
   MAX_PIXEL_RATIO: 1.5,
+  /** Anti-aliasing samples for the bloom path (0 = off; 4 = smooth edges). */
+  MSAA_SAMPLES: 4,
+  /** Flight time of a spell orb to its target (s). Short, so it still feels instant. */
+  PROJECTILE_S: 0.16,
+  /** Overlay (HUD) resolution cap: draws at the screen's real pixel density for crisp text. */
+  OVERLAY_MAX_PIXEL_RATIO: 2,
   SHADOWS: false,
   /** Glow on emissive things. Turn off first if FPS drops (after shadows). */
   BLOOM: { enabled: true, strength: 0.9, radius: 0.55, threshold: 0.8 },

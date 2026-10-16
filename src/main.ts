@@ -111,7 +111,9 @@ onStrokeEnd((points) => {
   const centre = overlay.worldUi.strokeCentre(points)!;
   if (debugOverlay.isVisible()) overlay.showDebugLabel(`${shape.name ?? 'no match'} ${shape.score.toFixed(2)}`, centre.x, centre.y);
   if (world.phase !== 'PLAYING' || screens.current) return; // menus: strokes do nothing
-  showCast(castSpell(world, shape.name, centre, world3d.project));
+  const result = castSpell(world, shape.name, centre, world3d.project);
+  overlay.worldUi.burnStroke(result, performance.now());
+  showCast(result, centre);
 });
 
 // Open palm = shield, instantly.
@@ -120,10 +122,15 @@ onPalm(() => {
 });
 
 /** 3D + overlay feedback for a cast (texts arrive separately, as game events). */
-function showCast(result: SpellResult) {
+function showCast(result: SpellResult, from?: { x: number; y: number }) {
   const color = result.spell ? SPELL_COLOR[result.spell] : undefined;
   if (color !== undefined) {
-    for (const hit of result.hits) world3d.burstAt(hit.pos, hit.enemyId, color, hit.effect === 'strong' ? 40 : 20);
+    for (const hit of result.hits) {
+      const burst = () => world3d.burstAt(hit.pos, hit.enemyId, color, hit.effect === 'strong' ? 40 : 20);
+      // Element spells fly as an orb from the sigil to the target; lightning strikes at once.
+      if (from && result.spell !== 'lightning') world3d.castProjectile(from, hit.pos, hit.enemyId, color, burst);
+      else burst();
+    }
   }
   overlay.worldUi.handleCast(result, view, performance.now());
   playCast(result);

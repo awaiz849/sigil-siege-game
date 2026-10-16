@@ -12,6 +12,10 @@ import { createEnvironment, WALL_TOP } from './environment.ts';
 import { createEnemyView } from './enemyView.ts';
 import { createParticles } from './particles.ts';
 import { PALETTE } from './palette.ts';
+import { radialTexture } from './environment.ts';
+
+/** A spell orb flying from where the sigil was drawn to its target. */
+type Shot = { sprite: THREE.Sprite; from: THREE.Vector3; to: THREE.Vector3; t: number; color: number; onArrive: () => void };
 
 export function createScene(canvas: HTMLCanvasElement) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -48,11 +52,33 @@ export function createScene(canvas: HTMLCanvasElement) {
   const enemies = createEnemyView(scene, particles);
 
   // Bloom makes emissive things (eyes, orbs, torches, moon) glow.
-  const composer = new EffectComposer(renderer);
+  // Multisampled render target: without it the post-processing path loses anti-aliasing (jagged edges).
+  const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: CONFIG.MSAA_SAMPLES });
+  const composer = new EffectComposer(renderer, target);
   composer.addPass(new RenderPass(scene, camera));
   const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), CONFIG.BLOOM.strength, CONFIG.BLOOM.radius, CONFIG.BLOOM.threshold);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
+
+  const shots: Shot[] = [];
+  const orbTexture = radialTexture('rgba(255,255,255,1)', 'rgba(255,255,255,0)');
+
+  function updateShots(dt: number) {
+    for (let i = shots.length - 1; i >= 0; i--) {
+      const s = shots[i];
+      s.t = Math.min(1, s.t + dt / CONFIG.PROJECTILE_S);
+      // Straight line plus a small upward arc.
+      s.sprite.position.lerpVectors(s.from, s.to, s.t);
+      s.sprite.position.y += Math.sin(s.t * Math.PI) * 0.8;
+      particles.burst(s.sprite.position.clone(), s.color, 3, 0.8, 0.2, 0.35); // spark trail
+      if (s.t >= 1) {
+        scene.remove(s.sprite);
+        s.sprite.material.dispose();
+        shots.splice(i, 1);
+        s.onArrive();
+      }
+    }
+  }
 
   let width = 1;
   let height = 1;
@@ -74,6 +100,7 @@ export function createScene(canvas: HTMLCanvasElement) {
     time += dt;
     environment.update(time, dt);
     enemies.update(world, time, dt);
+    updateShots(dt);
     particles.update(dt);
 
     // Camera shake (castle hits) + a very slow idle sway so the view feels alive.
@@ -112,6 +139,21 @@ export function createScene(canvas: HTMLCanvasElement) {
     projectPoint,
     /** Model height of an enemy (world units). */
     heightOf: (id: number) => enemies.heightOf(id),
+    /** Fire a glowing orb from a screen point (where the sigil was drawn) to a world position at an enemy. */
+    castProjectile(screen: { x: number; y: number }, pos: { x: number; y: number; z: number }, enemyId: number, color: number, onArrive: () => void) {
+      // Start a few metres in front of the camera, along the ray through the sigil's centre.
+      const ndc = new THREE.Vector3((screen.x / width) * 2 - 1, -(screen.y / height) * 2 + 1, 0.5).unproject(camera);
+      const dir = ndc.sub(camera.position).normalize();
+      const from = camera.position.clone().addScaledVector(dir, 3);
+      const to = new THREE.Vector3(pos.x, pos.y + enemies.heightOf(enemyId) * 0.5, pos.z);
+      const sprite = new THREE.Sprite(
+        new THREE.SpriteMaterial({ map: orbTexture, color, blending: THREE.AdditiveBlending, depthWrite: false }),
+      );
+      sprite.scale.setScalar(1.3);
+      sprite.position.copy(from);
+      scene.add(sprite);
+      shots.push({ sprite, from, to, t: 0, color, onArrive });
+    },
     /** Kick the camera (0..1). */
     shake(amount: number) {
       shakeAmount = Math.min(1, shakeAmount + amount);
