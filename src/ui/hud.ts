@@ -23,6 +23,7 @@ export function drawHud(ctx: CanvasRenderingContext2D, world: World, now: number
   ctx.textBaseline = 'middle';
   drawCastleHp(ctx, world, s, now);
   drawMana(ctx, world, s, now);
+  drawMeteor(ctx, world, s, now);
   drawClock(ctx, world, s, w);
   drawScore(ctx, world, s, w);
   drawSpellbook(ctx, world, s, h);
@@ -105,6 +106,41 @@ function drawMana(ctx: CanvasRenderingContext2D, world: World, s: number, now: n
   // A tick at every cheap-spell's worth, so you can count casts left.
   ctx.fillStyle = 'rgba(13,11,36,0.7)';
   for (let k = cheapest; k < CONFIG.MANA.max; k += cheapest) ctx.fillRect(bx + (bw * k) / CONFIG.MANA.max - 1, by, 2, bh);
+}
+
+/** METEOR meter: fills from kills and perfect sigils; when full it glows and says how to throw. */
+function drawMeteor(ctx: CanvasRenderingContext2D, world: World, s: number, now: number) {
+  const x = 16 * s;
+  const y = 120 * s;
+  const pw = 300 * s;
+  const ph = 30 * s;
+  const full = world.ultimate >= CONFIG.METEOR.meterMax;
+  panel(ctx, x, y, pw, ph, s);
+  if (full) {
+    // Pulsing orange outline when it's ready.
+    roundRect(ctx, x, y, pw, ph, 8 * s);
+    ctx.strokeStyle = `rgba(255, 140, 50, ${0.6 + 0.4 * Math.sin(now / 150)})`;
+    ctx.lineWidth = 3 * s;
+    ctx.stroke();
+  }
+  ctx.font = `${12 * s}px ${FONT_TITLE}`;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#ff9a4a';
+  ctx.fillText('METEOR', x + 14 * s, y + ph / 2 + 1 * s);
+  const bx = x + 84 * s;
+  const bw = pw - 98 * s;
+  const by = y + 10 * s;
+  const bh = 10 * s;
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  ctx.fillRect(bx, by, bw, bh);
+  ctx.fillStyle = full ? (Math.floor(now / 200) % 2 ? '#ffd25a' : '#ff7a30') : '#ff7a30';
+  ctx.fillRect(bx, by, (bw * Math.min(world.ultimate, CONFIG.METEOR.meterMax)) / CONFIG.METEOR.meterMax, bh);
+  if (full) {
+    ctx.font = `${11 * s}px ${FONT_TITLE}`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('READY: FLICK or BOTH PALMS', bx + bw / 2, by + bh / 2 + 1 * s);
+  }
 }
 
 function drawClock(ctx: CanvasRenderingContext2D, world: World, s: number, w: number) {

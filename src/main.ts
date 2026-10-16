@@ -9,17 +9,17 @@ import { createDebugOverlay } from './ui/debugOverlay.ts';
 import { createCameraCorner } from './ui/cameraCorner.ts';
 import { loadFonts } from './ui/fonts.ts';
 import { createScreens, type CameraState } from './ui/screens.ts';
-import { playCast, playEvents } from './audio/sound.ts';
+import { playCast, playEvents, sound } from './audio/sound.ts';
 import { setMusicIntensity, updateMusic } from './audio/music.ts';
 import { callout } from './audio/voice.ts';
 import { createMouseInput } from './input/mouseInput.ts';
 import { createHandInput, type HandInput } from './input/handInput.ts';
-import { onPalm, onStrokeEnd, onStrokePoint, onStrokeStart } from './events.ts';
+import { onPalm, onStrokeEnd, onStrokePoint, onStrokeStart, onThrow } from './events.ts';
 import { classify } from './recognizer/index.ts';
 import { createRecorder } from './recognizer/recorder.ts';
 import type { GameEvent, Hero, World } from './game/types.ts';
 import { createWorld, startRound, takeEvents, update } from './game/world.ts';
-import { castShield, castSpell, HERO_SPELLS, type SpellResult } from './game/spells.ts';
+import { castMeteor, castShield, castSpell, HERO_SPELLS, pickTarget, type SpellResult } from './game/spells.ts';
 import { formatRoundLog, noteStrokeStart } from './game/roundLog.ts';
 
 const glCanvas = document.createElement('canvas');
@@ -172,6 +172,33 @@ onStrokeEnd((points) => {
 onPalm(() => {
   if (screens.current === 'tutorial') screens.tutorialPalm();
   if (world.phase === 'PLAYING' && !screens.current) showCast(castShield(world));
+});
+
+// METEOR ultimate: a fast hand flick or both palms pushed forward (mouse: middle button).
+// Meter not full = "METEOR 60%". Full = a meteor falls on the monster nearest the aim point and
+// the blast damage happens when it lands.
+let meteorFalling = false;
+onThrow((x, y) => {
+  if (world.phase !== 'PLAYING' || screens.current || meteorFalling) return;
+  const aim = { x, y };
+  if (world.ultimate < CONFIG.METEOR.meterMax) {
+    showCast(castMeteor(world, aim, world3d.project)); // just the "charging" text
+    return;
+  }
+  const id = pickTarget(world, aim, world3d.project);
+  const target = world.enemies.find((e) => e.id === id);
+  if (!target) return;
+  meteorFalling = true;
+  sound.meteorWhoosh();
+  world3d.wizardCast(0xff7a30);
+  world3d.meteor(target.pos, () => {
+    meteorFalling = false;
+    sound.meteorBoom();
+    // Aim where the target is now (it kept walking while the meteor fell).
+    const now = world.enemies.find((e) => e.id === id);
+    const r = castMeteor(world, (now && world3d.project(now)) || aim, world3d.project);
+    showCast(r);
+  });
 });
 
 /** Hit-stop: the game freezes until this time (ms) after a kill, so kills feel heavy. */

@@ -27,6 +27,12 @@ export const CONFIG = {
    *  aimLookbackMs = aim where the cursor was this long before the throw fired,
    *  maxGapS = a longer gap between camera frames resets the measurement. */
   THROW: { speed: 8, frames: 2, cooldownMs: 800, aimLookbackMs: 200, maxGapS: 0.2 },
+  /** METEOR "both palms" gesture (input/palmsPush.ts): both hands open and pushed toward the camera
+   *  (average hand size x grow within pushMs), or both palms simply held up for holdMs.
+   *  enabled = track 2 hands (costs some tracking FPS; false = only the one-hand flick). */
+  PALMS_PUSH: { enabled: true, grow: 1.2, pushMs: 600, holdMs: 800, cooldownMs: 1500 },
+  /** Meteor look (render): seconds it takes to fall from the sky; it lands, THEN the damage happens. */
+  METEOR_FX: { fallS: 0.75 },
   /** Strokes shorter than this are ignored. */
   MIN_STROKE_POINTS: 8,
   MIN_STROKE_PX: 40,

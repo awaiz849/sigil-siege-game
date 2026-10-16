@@ -17,7 +17,7 @@ import { createWizard } from './wizard.ts';
 import { createCastleFire } from './castleFire.ts';
 import { createEnding } from './ending.ts';
 import { castleMaxHp } from '../game/difficulty.ts';
-import { InkOutlinePass } from './toon.ts';
+import { InkOutlinePass, toon } from './toon.ts';
 import { mixNum, themedColor, themeForWave, THEMES, type PerTheme, type Themed, type ThemeWeights } from './themes.ts';
 
 /** A spell orb flying from where the sigil was drawn to its target. */
@@ -187,6 +187,52 @@ export function createScene(canvas: HTMLCanvasElement) {
   }
 
   /** Launch an orb from -> to; onArrive runs when it lands. */
+  // METEOR ultimate: a burning rock falls from high over the field, then explodes.
+  type Meteor = { group: THREE.Group; rock: THREE.Mesh; from: THREE.Vector3; to: THREE.Vector3; t: number; trailT: number; onImpact: () => void };
+  const meteors: Meteor[] = [];
+  const meteorGeo = new THREE.IcosahedronGeometry(1.1, 1);
+  const meteorMat = toon({ color: 0x5a2a1a, emissive: 0xff5a10, emissiveIntensity: 1.4 });
+  function dropMeteor(target: { x: number; z: number }, onImpact: () => void) {
+    const group = new THREE.Group();
+    const rock = new THREE.Mesh(meteorGeo, meteorMat);
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: orbTexture, color: 0xff8a30, blending: THREE.AdditiveBlending, depthWrite: false }));
+    glow.scale.setScalar(5.5);
+    group.add(glow, rock);
+    const to = new THREE.Vector3(target.x, 0.6, target.z);
+    const from = to.clone().add(new THREE.Vector3(12, 40, -28)); // from high up, beyond the field
+    group.position.copy(from);
+    scene.add(group);
+    meteors.push({ group, rock, from, to, t: 0, trailT: 0, onImpact });
+  }
+  function updateMeteors(dt: number) {
+    for (let i = meteors.length - 1; i >= 0; i--) {
+      const m = meteors[i];
+      m.t = Math.min(1, m.t + dt / CONFIG.METEOR_FX.fallS);
+      m.group.position.lerpVectors(m.from, m.to, m.t * m.t); // speeds up as it falls
+      m.rock.rotation.x += dt * 6;
+      m.rock.rotation.y += dt * 4;
+      m.trailT -= dt;
+      if (m.trailT <= 0) {
+        m.trailT = 0.02;
+        particles.burst(m.group.position, 0xff7a20, 6, 1.5, 0, 0.5); // fire trail
+        particles.burst(m.group.position, 0x3a3034, 3, 1, 1, 1.2); // smoke
+      }
+      if (m.t < 1) continue;
+      scene.remove(m.group);
+      meteors.splice(i, 1);
+      const at = m.to.clone().setY(1);
+      particles.burst(at, 0xff6a1a, 140, 12, 4, 1.0); // fireball
+      particles.burst(at, 0xffd25a, 60, 7, 3, 0.7); // bright core
+      particles.burst(at, 0x2e2628, 50, 4, 5, 1.8); // smoke column
+      particles.burst(at, 0x7a6a5a, 40, 8, 6, 1.2); // rocks and dirt
+      flash(at, 0xffa040, 18);
+      shockwave(m.to.x, m.to.z, 0xff7a30);
+      shockwave(m.to.x, m.to.z, 0xffd25a);
+      shakeAmount = 1;
+      m.onImpact();
+    }
+  }
+
   function fire(from: THREE.Vector3, to: THREE.Vector3, color: number, onArrive: () => void) {
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: orbTexture, color, blending: THREE.AdditiveBlending, depthWrite: false }));
     sprite.scale.setScalar(1.3);
@@ -276,6 +322,7 @@ export function createScene(canvas: HTMLCanvasElement) {
     updateShots(dt);
     updateWaves(dt);
     updateFlashes(dt);
+    updateMeteors(dt);
     particles.update(dt);
 
     // Camera shake (castle hits) + a very slow idle sway so the view feels alive.
@@ -337,6 +384,10 @@ export function createScene(canvas: HTMLCanvasElement) {
     /** The element being drawn (live recognition): the wizard's orb glows in it. */
     wizardElement(color: number | null) {
       wizard.setElement(color);
+    },
+    /** METEOR: a burning rock falls onto this spot; onImpact runs when it lands (the damage happens then). */
+    meteor(target: { x: number; z: number }, onImpact: () => void) {
+      dropMeteor(target, onImpact);
     },
     /** Light up the whole scene (lightning). */
     lightningFlash() {

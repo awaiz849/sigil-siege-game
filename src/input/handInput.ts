@@ -7,7 +7,9 @@
 //   other (fist etc.)   -> also ends the stroke (forgiving: a drifting hand still casts)
 //   palm (four fingers) -> shield; cancels a stroke in progress
 // Pinch mode (fallback): pinch thumb + index = pen down, release = pen up. Palm still = shield.
-// Both modes: a fast flick of the hand while the pen is up = THROW (meteor ultimate).
+// Both modes: a fast flick of the hand while the pen is up = THROW (meteor ultimate),
+// and so is pushing BOTH open palms toward the camera (CONFIG.PALMS_PUSH; tracks 2 hands).
+// With two hands in view, the one that was already being tracked keeps drawing.
 import { HandLandmarker } from '@mediapipe/tasks-vision';
 import { CONFIG } from '../config.ts';
 import { emitCursor, emitPalm, emitStrokeEnd, emitStrokePoint, emitStrokeStart, emitThrow, type Point, type Pose } from '../events.ts';
@@ -15,6 +17,7 @@ import { OneEuroFilter } from './oneEuro.ts';
 import { classifyPose, pinchRatio, PoseStabilizer, type Landmark } from './poses.ts';
 import { isStrokeLongEnough } from './strokeFilter.ts';
 import { ThrowDetector } from './throwDetector.ts';
+import { PalmsPush } from './palmsPush.ts';
 
 const BASE = `${import.meta.env.BASE_URL}mediapipe/`;
 
@@ -44,6 +47,9 @@ export async function createHandInput() {
 
   // Fast flick = throw (meteor). Only while the pen is up, so drawing never fires it.
   const throwDetector = new ThrowDetector();
+  // Both open palms pushed forward = meteor too.
+  const palmsPush = new PalmsPush();
+  let primaryWrist: Landmark | null = null;
 
   // Smoothed cursor in screen pixels.
   const fx = new OneEuroFilter(CONFIG.ONE_EURO_MIN_CUTOFF, CONFIG.ONE_EURO_BETA);
@@ -116,11 +122,27 @@ export async function createHandInput() {
     if (lastDetectAt > 0) debug.trackingFps += (1000 / (now - lastDetectAt) - debug.trackingFps) * 0.1;
     lastDetectAt = now;
 
-    const lm = result.landmarks[0];
+    // Two hands: the one nearest where the drawing hand was keeps the cursor.
+    const hands = result.landmarks;
+    let lm = hands[0];
+    if (hands.length > 1 && primaryWrist) {
+      const d = (h: Landmark[]) => Math.hypot(h[0].x - primaryWrist!.x, h[0].y - primaryWrist!.y);
+      lm = d(hands[1]) < d(hands[0]) ? hands[1] : hands[0];
+    }
     if (!lm) {
       handLost();
+      primaryWrist = null;
+      palmsPush.reset();
       return;
     }
+    primaryWrist = lm[0];
+    // Both palms pushed forward: the meteor, aimed between the hands (no shield, no stroke).
+    const both = CONFIG.PALMS_PUSH.enabled ? palmsPush.push(now, hands) : null;
+    if (both) {
+      const aim = toScreen(both);
+      emitThrow(aim.x, aim.y);
+    }
+    const twoPalms = hands.length > 1 && hands.every((h) => classifyPose(h) === 'palm');
     debug.handVisible = true;
     debug.landmarks = lm;
 
@@ -134,7 +156,7 @@ export async function createHandInput() {
     // Palm = shield, once per opening of the hand (both modes).
     if (stablePose === 'palm' && previous !== 'palm') {
       endStroke(false);
-      emitPalm();
+      if (!twoPalms) emitPalm(); // both palms up is the meteor, not the shield
     }
 
     // 2. Cursor: index tip (poses) or between thumb and index (pinch). Smoothed.
@@ -222,7 +244,7 @@ async function createLandmarker(): Promise<HandLandmarker> {
   const options = (delegate: 'GPU' | 'CPU') => ({
     baseOptions: { modelAssetPath: `${BASE}hand_landmarker.task`, delegate },
     runningMode: 'VIDEO' as const,
-    numHands: 1,
+    numHands: CONFIG.PALMS_PUSH.enabled ? 2 : 1,
     minHandDetectionConfidence: CONFIG.HAND_DETECTION_CONFIDENCE,
     minTrackingConfidence: CONFIG.HAND_TRACKING_CONFIDENCE,
   });

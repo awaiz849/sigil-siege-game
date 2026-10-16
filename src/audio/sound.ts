@@ -98,6 +98,16 @@ export const sound = {
     [0, 4, 7, 12].forEach((s, i) => tone('triangle', note(s - 5), note(s - 5), 0.4, 0.15, i * 0.04));
     noise('highpass', 3000, 6000, 0.15, 0.05);
   },
+  /** Meteor thrown: a rising rushing-air whoosh. */
+  meteorWhoosh() {
+    noise('bandpass', 300, 1800, 0.75, 0.22);
+  },
+  /** Meteor lands: a deep explosion. */
+  meteorBoom() {
+    noise('lowpass', 900, 80, 1.1, 0.55);
+    tone('sine', 95, 28, 1.0, 0.7);
+    tone('sawtooth', 170, 40, 0.45, 0.14);
+  },
   lightning() {
     noise('highpass', 6000, 1500, 0.15, 0.6);
     noise('lowpass', 300, 60, 1.0, 0.5, 0.05);
