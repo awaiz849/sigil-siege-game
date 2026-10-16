@@ -64,7 +64,10 @@ export const CONFIG = {
    *  mana, but only when the spell actually does something (hit, kill, push or block). */
   PERFECT_SIGIL: { minScore: 0.92, bonus: 50, mana: 8 },
   /** Precheck: end-to-end distance / path length at or above this = line. */
-  LINE_STRAIGHTNESS: 0.95,
+  /** Line (wind / time warp) check: after smoothing out hand jitter, the stroke may bend away from the
+   *  straight segment between its ends by at most maxBend x its length (air lines wobble and arc a bit),
+   *  and must not double back (end gap / path length >= minStraightness). */
+  LINE: { maxBend: 0.11, minStraightness: 0.6 },
   /** Precheck: end gap below this fraction of the bounding-box diagonal = closed shape. */
   CLOSED_GAP_RATIO: 0.25,
 
