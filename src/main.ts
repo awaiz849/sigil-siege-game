@@ -97,6 +97,10 @@ function newRound(difficulty: Difficulty) {
   world = startRound(createWorld(difficulty));
 }
 
+// Dev only (npm run dev): window.sigil.world() in the browser console gives the live World,
+// e.g. sigil.world().castleHp = 30 to see the castle burn, or .time = 58 to jump to wave 3.
+if (import.meta.env.DEV) Object.assign(window, { sigil: { world: () => world } });
+
 // Screens: hand check -> title -> (game) -> end. All hands-free.
 const screens = createScreens({
   hand: () => hand,

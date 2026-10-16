@@ -14,6 +14,8 @@ import { createParticles } from './particles.ts';
 import { ELEMENT_COLOR, PALETTE } from './palette.ts';
 import { radialTexture } from './environment.ts';
 import { createWizard } from './wizard.ts';
+import { createCastleFire } from './castleFire.ts';
+import { castleMaxHp } from '../game/difficulty.ts';
 import { InkOutlinePass } from './toon.ts';
 
 /** A spell orb flying from where the sigil was drawn to its target. */
@@ -51,6 +53,8 @@ export function createScene(canvas: HTMLCanvasElement) {
   scene.add(rim);
 
   const environment = createEnvironment(scene);
+  // The castle burns as it loses HP.
+  const castleFire = createCastleFire(scene);
   const wizard = createWizard();
   wizard.group.position.set(CONFIG.CAMERA.wizardX, WALL_TOP, CONFIG.FIELD.wallZ + CONFIG.CAMERA.wizardBack);
   scene.add(wizard.group);
@@ -198,6 +202,7 @@ export function createScene(canvas: HTMLCanvasElement) {
   function render(world: World, dt: number) {
     time += dt;
     environment.update(time, dt);
+    castleFire.update(world.castleHp / castleMaxHp(world), time, dt);
     wizard.update(time, dt);
     // A trickle of golden sparks from the wizard's orb.
     sparkT += dt;
