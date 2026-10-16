@@ -40,6 +40,7 @@ export const CONFIG = {
   // ---- Spells ----
   LIGHTNING_COOLDOWN_S: 10,
   SHIELD_STUN_S: 3,
+  DMG_BASE: 1,
   DMG_STRONG: 2,
   DMG_WEAK: 0.5,
   DMG_STUNNED: 2,
