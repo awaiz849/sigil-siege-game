@@ -15,6 +15,8 @@ export const CONFIG = {
   /** Strokes shorter than this are ignored. */
   MIN_STROKE_POINTS: 8,
   MIN_STROKE_PX: 40,
+  /** Debug mouse: ignore moves smaller than this while drawing. */
+  MOUSE_MIN_STEP_PX: 3,
   /** Hold times for hands-free menus. */
   PALM_HOLD_START_S: 1.2,
   HOVER_SELECT_S: 0.8,

@@ -7,7 +7,13 @@ export function createOverlay(canvas: HTMLCanvasElement) {
   let cursor: { x: number; y: number; pose: Pose } | null = null;
   let trail: Point[] = [];
 
-  onCursor((x, y, pose) => (cursor = { x, y, pose }));
+  let mouseDebug = false;
+
+  onCursor((x, y, pose) => {
+    cursor = { x, y, pose };
+    // Pen lifted: clear the trail even if the stroke was too short to be emitted.
+    if (pose !== 'point') trail = [];
+  });
   onStrokeStart(() => (trail = []));
   onStrokePoint((x, y) => trail.push({ x, y }));
   onStrokeEnd(() => (trail = []));
@@ -39,7 +45,22 @@ export function createOverlay(canvas: HTMLCanvasElement) {
       ctx.arc(cursor.x, cursor.y, 8, 0, Math.PI * 2);
       ctx.fill();
     }
+
+    // Big label so mouse mode is never mistaken for the real hands-free demo.
+    if (mouseDebug) {
+      ctx.font = 'bold 32px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+      ctx.fillRect(canvas.width / 2 - 200, 12, 400, 48);
+      ctx.fillStyle = '#ff5a5a';
+      ctx.fillText('MOUSE DEBUG MODE', canvas.width / 2, 20);
+    }
   }
 
-  return { resize, draw };
+  function setMouseDebug(on: boolean) {
+    mouseDebug = on;
+  }
+
+  return { resize, draw, setMouseDebug };
 }
