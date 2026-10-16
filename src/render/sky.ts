@@ -4,6 +4,7 @@
 //   mountains  three layers of jagged peaks, snow on top, warm where the sun hits, hazy at the base
 //   mist       soft white bands in the valleys between the layers
 //   clouds     puffy clouds lit orange from below, drifting slowly
+//   night      in wave 3 setNight(0..1) fades it all to night: the sun sinks, moon and stars come out
 // Far things ignore the fog and fake their own haze with colour, so they stay readable.
 import * as THREE from 'three';
 import { CONFIG } from '../config.ts';
@@ -27,13 +28,53 @@ const heightAt = (z: number, deg: number) => camY() + (camZ() - z) * Math.tan(TH
 const sunSlope = () => CONFIG.SCENERY.sun.x / (camZ() - CONFIG.SCENERY.sun.z);
 
 export function createSky(scene: THREE.Scene) {
-  scene.add(skyDome());
-  scene.add(sun());
-  mountainLayers().forEach((m) => scene.add(m));
-  valleyMist().forEach((m) => scene.add(m));
+  const dome = skyDome();
+  const sunGroup = sun();
+  const moonGroup = moon();
+  const stars = createStars();
+  const mountains = mountainLayers();
+  const mist = valleyMist();
   const clouds = createClouds();
+  scene.add(dome, sunGroup, moonGroup, stars);
+  mountains.forEach((m) => scene.add(m));
+  mist.forEach((m) => scene.add(m));
   scene.add(clouds.group);
-  return { update: clouds.update };
+
+  const u = (dome.material as THREE.ShaderMaterial).uniforms;
+  const day = { top: new THREE.Color(PALETTE.skyTop), mid: new THREE.Color(PALETTE.skyMid), horizon: new THREE.Color(PALETTE.skyHorizon), glow: new THREE.Color(PALETTE.horizonGlow) };
+  const night = { top: new THREE.Color(PALETTE.nightTop), mid: new THREE.Color(PALETTE.nightMid), horizon: new THREE.Color(PALETTE.nightHorizon), glow: new THREE.Color(PALETTE.nightGlow) };
+  const nightTint = new THREE.Color(0x343058); // mountains and clouds in moonlight
+  const white = new THREE.Color(0xffffff);
+  const sunY = sunGroup.position.y;
+  const starMat = stars.material as THREE.PointsMaterial;
+  const moonMats: THREE.Material[] = [];
+  moonGroup.traverse((o) => {
+    const m = (o as THREE.Mesh).material as THREE.Material | undefined;
+    if (m) moonMats.push(m);
+  });
+  let shown = -1;
+
+  return {
+    update: clouds.update,
+    /** 0 = sunset, 1 = night. */
+    setNight(n: number) {
+      if (Math.abs(n - shown) < 0.002) return;
+      shown = n;
+      for (const k of ['top', 'mid', 'horizon', 'glow'] as const) (u[k].value as THREE.Color).copy(day[k]).lerp(night[k], n);
+      sunGroup.position.y = sunY - n * 40; // sinks behind the mountains
+      sunGroup.visible = n < 0.95;
+      for (const m of moonMats) {
+        m.transparent = true;
+        m.opacity = THREE.MathUtils.smoothstep(n, 0.4, 1);
+      }
+      moonGroup.visible = n > 0.4;
+      starMat.opacity = 0.85 * THREE.MathUtils.smoothstep(n, 0.5, 1);
+      stars.visible = n > 0.5;
+      for (const m of mountains) (m.material as THREE.MeshBasicMaterial).color.copy(white).lerp(nightTint, n);
+      for (const s of mist) (s.material as THREE.SpriteMaterial).color.copy(white).lerp(nightTint, n * 0.9);
+      clouds.setColor((c) => c.copy(white).lerp(nightTint, n));
+    },
+  };
 }
 
 // ---------------------------------------------------------------- sky dome
@@ -95,6 +136,41 @@ function sun(): THREE.Group {
   g.position.set(s.x, s.y, s.z);
   g.renderOrder = -1;
   return g;
+}
+
+// ---------------------------------------------------------------- night: moon + stars
+
+function moon(): THREE.Group {
+  const g = new THREE.Group();
+  const disc = new THREE.Mesh(new THREE.SphereGeometry(9, 32, 16), new THREE.MeshBasicMaterial({ color: PALETTE.moon, fog: false }));
+  const halo = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: radialTexture('rgba(255,236,200,0.35)', 'rgba(255,236,200,0)'), blending: THREE.AdditiveBlending, depthWrite: false, fog: false }),
+  );
+  halo.scale.set(80, 80, 1);
+  g.add(halo, disc);
+  // High on the left, where the sun was: in the sky band the camera sees.
+  g.position.set(-70, heightAt(-300, 9.5), -300);
+  g.visible = false;
+  return g;
+}
+
+function createStars(): THREE.Points {
+  const count = 700;
+  const pos = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    const theta = range(0, Math.PI * 2);
+    const y = Math.pow(rand(), 0.7) * 0.9 + 0.04;
+    const r = Math.sqrt(1 - y * y);
+    pos.set([Math.cos(theta) * r * 380, y * 380, Math.sin(theta) * r * 380], i * 3);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const stars = new THREE.Points(
+    geo,
+    new THREE.PointsMaterial({ color: 0xffffff, size: 1.6, sizeAttenuation: false, transparent: true, opacity: 0, fog: false, depthWrite: false }),
+  );
+  stars.visible = false;
+  return stars;
 }
 
 // ---------------------------------------------------------------- mountains
@@ -244,6 +320,10 @@ function createClouds() {
     group,
     update(t: number) {
       for (const c of clouds) c.s.position.x = ((c.x0 + t * c.speed + span / 2) % span) - span / 2;
+    },
+    /** Tint every cloud (night fades them to dark blue-grey). */
+    setColor(set: (c: THREE.Color) => void) {
+      for (const c of clouds) set((c.s.material as THREE.SpriteMaterial).color);
     },
   };
 }

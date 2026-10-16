@@ -49,6 +49,11 @@ export function createEnvironment(scene: THREE.Scene) {
     update(t: number, dt: number) {
       for (const u of updaters) u(t, dt);
     },
+    /** 0 = sunset, 1 = night (wave 3). */
+    setNight(n: number) {
+      sky.setNight(n);
+      valley.setNight(n);
+    },
   };
 }
 

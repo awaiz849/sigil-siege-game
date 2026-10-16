@@ -22,11 +22,16 @@ const range = (a: number, b: number) => a + rand() * (b - a);
 type Piece = { object: THREE.Object3D; update?: (t: number) => void };
 
 export function createValley(scene: THREE.Scene) {
-  const pieces: Piece[] = [createRiver(), createBridge(), createCliffCastle(), createSiegeTowers(), createFences()];
+  const river = createRiver();
+  const pieces: Piece[] = [river, createBridge(), createCliffCastle(), createSiegeTowers(), createFences()];
   for (const p of pieces) scene.add(p.object);
   return {
     update(t: number) {
       for (const p of pieces) p.update?.(t);
+    },
+    /** 0 = sunset, 1 = night: the river turns dark blue. */
+    setNight(n: number) {
+      river.water.color.set(0xb9bff0).lerp(new THREE.Color(0x2a3060), n);
     },
   };
 }
@@ -51,7 +56,7 @@ function waterTexture(): THREE.CanvasTexture {
   return tex;
 }
 
-function createRiver(): Piece {
+function createRiver(): Piece & { water: THREE.MeshBasicMaterial } {
   const pts = riverPoints();
   const w = CONFIG.SCENERY.riverWidth;
   const pos: number[] = [];
@@ -100,6 +105,7 @@ function createRiver(): Piece {
   });
   return {
     object: group,
+    water: water.material as THREE.MeshBasicMaterial,
     update(t) {
       map.offset.y = -t * 0.25; // flows downstream
       glints.forEach((g, k) => ((g.material as THREE.SpriteMaterial).opacity = 0.35 + 0.35 * Math.sin(t * 2.5 + k * 1.9)));

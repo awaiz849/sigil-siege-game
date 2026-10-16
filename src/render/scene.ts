@@ -53,6 +53,21 @@ export function createScene(canvas: HTMLCanvasElement) {
   scene.add(rim);
 
   const environment = createEnvironment(scene);
+  // Sunset -> night (wave 3): the colours both ends fade between.
+  let night = 0;
+  const fog = scene.fog as THREE.FogExp2;
+  const daySky = sky.color.clone();
+  const nightSky = new THREE.Color(0x5a64b8);
+  const dayGround = sky.groundColor.clone();
+  const nightGround = new THREE.Color(0x120c1c);
+  const dayKey = key.color.clone();
+  const moonKey = new THREE.Color(0x9fb4ff);
+  const dayRim = rim.color.clone();
+  const nightRim = new THREE.Color(0x6a5cff);
+  const dayFog = fog.color.clone();
+  const nightFog = new THREE.Color(PALETTE.nightFog);
+  const dayBg = (scene.background as THREE.Color).clone();
+  const nightBg = new THREE.Color(PALETTE.nightHorizon);
   // The castle burns as it loses HP.
   const castleFire = createCastleFire(scene);
   const wizard = createWizard();
@@ -202,6 +217,20 @@ export function createScene(canvas: HTMLCanvasElement) {
   function render(world: World, dt: number) {
     time += dt;
     environment.update(time, dt);
+    // Night falls in wave 3 (eases back to sunset when a new round starts).
+    const nf = CONFIG.NIGHTFALL;
+    const wantNight = world.phase === 'MENU' ? 0 : THREE.MathUtils.smoothstep(world.time, nf.startS, nf.startS + nf.seconds);
+    night += (wantNight - night) * Math.min(1, dt * 2);
+    environment.setNight(night);
+    sky.color.copy(daySky).lerp(nightSky, night);
+    sky.groundColor.copy(dayGround).lerp(nightGround, night);
+    key.color.copy(dayKey).lerp(moonKey, night);
+    key.intensity = THREE.MathUtils.lerp(CONFIG.SUNSET.key, nf.key, night);
+    rim.color.copy(dayRim).lerp(nightRim, night);
+    rim.intensity = THREE.MathUtils.lerp(CONFIG.SUNSET.rim, nf.rim, night);
+    fog.color.copy(dayFog).lerp(nightFog, night);
+    fog.density = THREE.MathUtils.lerp(CONFIG.SUNSET.fog, nf.fog, night);
+    (scene.background as THREE.Color).copy(dayBg).lerp(nightBg, night);
     castleFire.update(world.castleHp / castleMaxHp(world), time, dt);
     wizard.update(time, dt);
     // A trickle of golden sparks from the wizard's orb.
@@ -212,7 +241,7 @@ export function createScene(canvas: HTMLCanvasElement) {
     }
     // Lightning flash: the whole scene lights up for a moment.
     lightningT = Math.max(0, lightningT - dt * 4);
-    sky.intensity = CONFIG.SUNSET.ambient + lightningT * 6;
+    sky.intensity = THREE.MathUtils.lerp(CONFIG.SUNSET.ambient, CONFIG.NIGHTFALL.ambient, night) + lightningT * 6;
     enemies.update(world, time, dt);
     updateShots(dt);
     updateWaves(dt);

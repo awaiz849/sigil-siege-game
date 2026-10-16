@@ -214,6 +214,9 @@ export const CONFIG = {
   /** Sunset look: sky fill light, warm key light from behind the castle, orange sun rim light
    *  from behind the monsters (the sun), fog density. Raise ambient/key if the screen is too dark. */
   SUNSET: { ambient: 1.3, key: 2.0, rim: 2.2, fog: 0.0052 },
+  /** Night falls in wave 3: from startS the scene fades from sunset to night over `seconds`
+   *  (sun sinks, moon and stars come out). The night light values: sky fill, moonlight, cold rim, fog. */
+  NIGHTFALL: { startS: 60, seconds: 12, ambient: 1.1, key: 2.2, rim: 1.3, fog: 0.011 },
   /** The sunset valley around the field (render only, world units; the field runs from z -4 to -42).
    *  sun = where the sun sits, far behind the mountains (the sky glow and the orange rim light follow it).
    *  river = points (x, z) the river flows through, from the waterfalls by the castle to the right edge.
