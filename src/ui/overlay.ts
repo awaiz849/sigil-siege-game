@@ -90,5 +90,5 @@ export function createOverlay(canvas: HTMLCanvasElement) {
     recordedCount = n;
   }
 
-  return { resize, draw, setMouseDebug, flash, setRecordedCount };
+  return { ctx, resize, draw, setMouseDebug, flash, setRecordedCount };
 }

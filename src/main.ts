@@ -1,8 +1,10 @@
 // Entry point: creates the two canvases (3D below, 2D overlay on top) and runs the frame loop.
 import { createScene } from './render/scene.ts';
 import { createOverlay } from './ui/overlay.ts';
+import { createDebugOverlay } from './ui/debugOverlay.ts';
 import { createMouseInput } from './input/mouseInput.ts';
-import { onStrokeEnd } from './events.ts';
+import { createHandInput, type HandInput } from './input/handInput.ts';
+import { onPalm, onStrokeEnd } from './events.ts';
 import { classify } from './recognizer/index.ts';
 import { createRecorder } from './recognizer/recorder.ts';
 
@@ -13,6 +15,7 @@ document.body.append(glCanvas, overlayCanvas);
 
 const world3d = createScene(glCanvas);
 const overlay = createOverlay(overlayCanvas);
+const debugOverlay = createDebugOverlay();
 
 function resize() {
   const w = window.innerWidth;
@@ -24,13 +27,29 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
-// Debug mouse input. On until hand tracking exists; later it is only the no-camera fallback.
+// ---- Input: hand tracking, or the mouse as a debug fallback ----
 const mouse = createMouseInput();
+let hand: HandInput | null = null;
+
 function setMouseMode(on: boolean) {
   mouse.setEnabled(on);
+  hand?.setEnabled(!on);
   overlay.setMouseDebug(on);
 }
-setMouseMode(true);
+
+overlay.flash('Starting camera...', 30);
+createHandInput()
+  .then((h) => {
+    hand = h;
+    setMouseMode(false);
+    overlay.flash('Hand tracking ready', 1.5);
+  })
+  .catch((err) => {
+    // No camera (or it was refused): MOUSE DEBUG MODE, clearly labelled.
+    console.warn('Hand input unavailable, using mouse debug mode', err);
+    setMouseMode(true);
+    overlay.flash('No camera found', 2);
+  });
 
 // Template recorder (debug). Its messages show on the overlay.
 const recorder = createRecorder((msg) => {
@@ -40,9 +59,10 @@ const recorder = createRecorder((msg) => {
 overlay.setRecordedCount(recorder.count());
 
 // Debug keys only (never needed during real gameplay).
-// M = toggle mouse input, R = record template, Shift+R = delete recorded templates.
+// M = toggle mouse input, D = debug overlay, R = record template, Shift+R = delete recorded templates.
 window.addEventListener('keydown', (e) => {
   if (e.key === 'm' || e.key === 'M') setMouseMode(!mouse.isEnabled());
+  if (e.key === 'd' || e.key === 'D') debugOverlay.toggle();
   if (e.key === 'R') recorder.clear();
   else if (e.key === 'r') recorder.arm();
 });
@@ -56,10 +76,14 @@ onStrokeEnd((points) => {
   overlay.flash(`${label} ${result.score.toFixed(2)}`);
   console.log('classify:', result);
 });
+onPalm(() => overlay.flash('SHIELD'));
 
-function frame() {
+function frame(now: number) {
+  hand?.update();
   world3d.render();
   overlay.draw();
+  debugOverlay.tick(now);
+  debugOverlay.draw(overlay.ctx, hand);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

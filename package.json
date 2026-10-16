@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test:recognizer": "node tests/recognizer.test.ts",
-    "test": "npm run test:recognizer"
+    "test": "npm run test:recognizer && npm run test:poses",
+    "test:poses": "node tests/poses.test.ts"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^1.1.1",

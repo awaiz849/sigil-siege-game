@@ -17,6 +17,20 @@ export const CONFIG = {
   MIN_STROKE_PX: 40,
   /** Debug mouse: ignore moves smaller than this while drawing. */
   MOUSE_MIN_STEP_PX: 3,
+  /** Hand: ignore fingertip moves smaller than this while drawing. */
+  HAND_MIN_STEP_PX: 3,
+  /** Finger is extended if tip-to-wrist > PIP-to-wrist x this. */
+  FINGER_EXTEND_RATIO: 1.15,
+  /** Only the inner part of the camera image maps to the screen (edges are hard to reach). */
+  HAND_EDGE_MARGIN: 0.12,
+  /** One Euro filter on the cursor (pixels). Lower minCutoff = smoother, higher beta = less lag. */
+  ONE_EURO_MIN_CUTOFF: 1.2,
+  ONE_EURO_BETA: 0.01,
+  /** MediaPipe confidences. */
+  HAND_DETECTION_CONFIDENCE: 0.6,
+  HAND_TRACKING_CONFIDENCE: 0.5,
+  CAMERA_WIDTH: 640,
+  CAMERA_HEIGHT: 480,
   /** Hold times for hands-free menus. */
   PALM_HOLD_START_S: 1.2,
   HOVER_SELECT_S: 0.8,
