@@ -163,7 +163,9 @@ export const CONFIG = {
   /** Hand check: each pose must be held this long to pass. */
   HAND_CHECK_HOLD_S: 0.6,
   /** Wait after the round ends before the end screen appears. */
-  END_SCREEN_DELAY_S: 1.5,
+  END_SCREEN_DELAY_S: 5,
+  /** Victory / defeat cinematic (render/ending.ts): seconds for the camera to swing out over the field. */
+  ENDING: { cameraS: 2.2 },
 
   // ---- Overlay UI ----
   /** Live recognition while drawing (trail colour + particles, wizard's orb): classify the

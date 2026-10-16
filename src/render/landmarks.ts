@@ -10,9 +10,12 @@ import { PALETTE } from './palette.ts';
 type Piece = { object: THREE.Object3D; update?: (t: number, dt: number) => void };
 
 export function createLandmarks(scene: THREE.Scene) {
-  const pieces: Piece[] = [createTower(-1), createTower(1), createRift()];
+  const towers = [createTower(-1), createTower(1)];
+  const pieces: Piece[] = [...towers, createRift()];
   for (const p of pieces) scene.add(p.object);
   return {
+    /** The two castle towers (the defeat cinematic topples them). */
+    towers: towers.map((t) => t.object),
     update(t: number, dt: number) {
       for (const p of pieces) p.update?.(t, dt);
     },

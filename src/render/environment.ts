@@ -49,6 +49,8 @@ export function createEnvironment(scene: THREE.Scene) {
     update(t: number, dt: number) {
       for (const u of updaters) u(t, dt);
     },
+    /** The castle we stand on (the defeat cinematic knocks it down). */
+    castle: { wall: wall.group, towers: landmarks.towers },
     /** 0 = sunset, 1 = night (wave 3). */
     setNight(n: number) {
       sky.setNight(n);

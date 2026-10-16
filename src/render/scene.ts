@@ -15,6 +15,7 @@ import { ELEMENT_COLOR, PALETTE } from './palette.ts';
 import { radialTexture } from './environment.ts';
 import { createWizard } from './wizard.ts';
 import { createCastleFire } from './castleFire.ts';
+import { createEnding } from './ending.ts';
 import { castleMaxHp } from '../game/difficulty.ts';
 import { InkOutlinePass } from './toon.ts';
 
@@ -76,6 +77,17 @@ export function createScene(canvas: HTMLCanvasElement) {
   let lightningT = 0;
   let sparkT = 0;
   const particles = createParticles(scene);
+  // Victory / defeat cinematics (camera swings out, banners + fireworks or the castle falls).
+  const ending = createEnding({
+    scene,
+    renderer,
+    particles,
+    wall: environment.castle.wall,
+    towers: environment.castle.towers,
+    hero: wizard.group,
+    heroCast: (color) => wizard.cast(color),
+    shake: (amount) => (shakeAmount = Math.min(1, Math.max(shakeAmount, amount))),
+  });
   // Archers shoot a glowing arrow at the wall when their charge completes.
   const enemies = createEnemyView(scene, particles, (from, enemy) => {
     const to = new THREE.Vector3(enemy.pos.x * 0.4, WALL_TOP + 0.8, CONFIG.FIELD.wallZ + 0.3);
@@ -249,14 +261,17 @@ export function createScene(canvas: HTMLCanvasElement) {
     particles.update(dt);
 
     // Camera shake (castle hits) + a very slow idle sway so the view feels alive.
+    // At the end of a round the cinematic takes the camera out over the field.
     shakeAmount = Math.max(0, shakeAmount - dt * 2.5);
     const s = shakeAmount * shakeAmount;
+    const cine = ending.update(world, dt, camBase, lookAt);
+    const base = cine ? cine.pos : camBase;
     camera.position.set(
-      camBase.x + Math.sin(time * 0.4) * 0.05 + (Math.random() - 0.5) * s,
-      camBase.y + Math.sin(time * 0.6) * 0.03 + (Math.random() - 0.5) * s,
-      camBase.z,
+      base.x + Math.sin(time * 0.4) * 0.05 + (Math.random() - 0.5) * s,
+      base.y + Math.sin(time * 0.6) * 0.03 + (Math.random() - 0.5) * s,
+      base.z,
     );
-    camera.lookAt(lookAt);
+    camera.lookAt(cine ? cine.look : lookAt);
 
     autoQuality(dt);
     // Post-processing chain: render -> ink outlines -> bloom (dropped first when FPS is low) -> output.

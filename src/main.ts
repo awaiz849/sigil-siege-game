@@ -247,7 +247,7 @@ function frame(now: number) {
   world3d.render(world, frozen ? 0 : dt);
   // HUD (+ pause button) only during a round; menus draw over the live 3D scene.
   overlay.draw(
-    world.phase === 'MENU' || screens.current ? null : world,
+    world.phase !== 'PLAYING' || screens.current ? null : world, // no HUD in menus or the end cinematic
     view,
     now,
     screens.current ? (ctx) => screens.draw(ctx, now) : (ctx) => screens.drawGameButtons(ctx),

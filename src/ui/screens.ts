@@ -487,7 +487,7 @@ export function createScreens(opts: Opts) {
     const cx = W / 2 - cw / 2;
     const cy = H * 0.33;
     roundRect(ctx, cx, cy, cw, ch, 14 * s);
-    ctx.fillStyle = 'rgba(13,11,36,0.9)';
+    ctx.fillStyle = 'rgba(13,11,36,0.72)'; // see-through: the victory / defeat scene shows behind it
     ctx.fill();
     ctx.strokeStyle = GOLD;
     ctx.lineWidth = 2 * s;
