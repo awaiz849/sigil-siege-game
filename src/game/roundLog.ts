@@ -71,7 +71,7 @@ export function formatRoundLog(world: World): string {
     rows.push(`  ${String(i + 1).padStart(2)}-${String(Math.min(i + 10, perSecond.length)).padEnd(2)}: ${perSecond.slice(i, i + 10).join(' ')}`);
   }
   return [
-    `ROUND LOG ${log.difficulty}: ${world.phase} at ${world.time.toFixed(1)} s, score ${world.score}, castle ${world.castleHp}/${CONFIG.CASTLE_HP}`,
+    `ROUND LOG ${log.difficulty}: ${world.phase} at ${world.time.toFixed(1)} s, score ${world.score}, castle ${world.castleHp}/${CONFIG.DIFFICULTY[log.difficulty].castleHp}`,
     `strokes: ${log.strokes.length}, pen down -> cast avg ${avg(times).toFixed(2)} s, slowest ${Math.max(0, ...times).toFixed(2)} s`,
     `results: ${Object.entries(counts).map(([k, n]) => `${k} ${n}`).join(', ') || 'none'}`,
     `kills: ${world.stats.kills} (per wave ${log.killsByWave.join(' / ')})`,

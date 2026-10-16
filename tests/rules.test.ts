@@ -5,6 +5,7 @@ import { CONFIG } from '../src/config.ts';
 import { effectiveness } from '../src/game/types.ts';
 import type { Enemy, World } from '../src/game/types.ts';
 import { createWorld, startRound, takeEvents, update } from '../src/game/world.ts';
+import { castleMaxHp } from '../src/game/difficulty.ts';
 import { spawnEnemy, updateEnemies, warlockStopZ } from '../src/game/enemies.ts';
 import { TEXT, castShield, castSpell, castSpellOn, counterShape, pickTarget } from '../src/game/spells.ts';
 import { pushApart } from '../src/game/crowd.ts';
@@ -23,6 +24,10 @@ const near = (a: number, b: number) => Math.abs(a - b) < 1e-6;
 
 /** Empty world in a running round: no spawns happen because we never call update on it (only updateEnemies). */
 const fresh = (): World => startRound(createWorld('normal', 42));
+
+/** Normal difficulty: castle HP and wall damage per monster type. */
+const HP = CONFIG.DIFFICULTY.normal.castleHp;
+const WALL = CONFIG.DIFFICULTY.normal.wallDamage;
 
 /** Fake renderer: screen x = 500 + 50 * world x, every enemy at screen y 300. */
 const fakeProject = (e: Enemy) => ({ x: 500 + e.pos.x * 50, y: 300 });
@@ -185,7 +190,7 @@ function runEnemies(world: World, seconds: number): void {
   runEnemies(w, walkTime + 0.05);
   check('warlock stops halfway', near(warlock.pos.z, warlockStopZ()) && warlock.state === 'charge');
   runEnemies(w, CONFIG.WARLOCK.chargeS);
-  check('warlock blast = 20', w.castleHp === CONFIG.CASTLE_HP - CONFIG.WARLOCK.blastDamage && warlock.state === 'recharge');
+  check('warlock blast = 20', w.castleHp === HP - CONFIG.WARLOCK.blastDamage && warlock.state === 'recharge');
   runEnemies(w, CONFIG.WARLOCK.rechargeS);
   check('warlock charges again', warlock.state === 'charge');
 }
@@ -207,7 +212,7 @@ function runEnemies(world: World, seconds: number): void {
   check('imp not stunned', imp.stunT === 0);
   imp.pos.z = CONFIG.FIELD.spawnZ; // keep the imp away from the wall
   runEnemies(w, 0.5);
-  check('blocked blast does no damage', w.castleHp === CONFIG.CASTLE_HP);
+  check('blocked blast does no damage', w.castleHp === HP);
   const zBefore = a.pos.z;
   runEnemies(w, 2);
   check('stunned enemy frozen', a.pos.z === zBefore && a.stunT > 0 && a.stateT === 0);
@@ -246,7 +251,7 @@ function runEnemies(world: World, seconds: number): void {
   check('wind with nothing to push = miss', cast(empty, 'line', null).kind === 'miss' && empty.combo === 1 && empty.windCooldown === 0);
 }
 
-// ---- Enemies at the wall: damage per type (imp/bird 5), removed. Birds dive. ----
+// ---- Enemies at the wall: damage per type (Normal: imp/bird 10), removed. Birds dive. ----
 {
   const w = fresh();
   const imp = spawnEnemy(w, 'imp', 'fire', 0);
@@ -256,8 +261,25 @@ function runEnemies(world: World, seconds: number): void {
   runEnemies(w, (distance - 2) / CONFIG.BIRD.speed);
   check('bird dives near the wall', bird.pos.y < CONFIG.BIRD_FLIGHT.flyY && bird.pos.y > CONFIG.BIRD_FLIGHT.diveY);
   runEnemies(w, distance / CONFIG.IMP.speed);
-  check('wall hits = imp + bird damage', w.castleHp === CONFIG.CASTLE_HP - CONFIG.WALL_HIT_DAMAGE.imp - CONFIG.WALL_HIT_DAMAGE.bird);
+  check('wall hits = imp + bird damage', w.castleHp === HP - WALL.imp - WALL.bird);
   check('enemies removed at wall', !w.enemies.includes(imp) && !w.enemies.includes(bird));
+}
+
+// ---- Castle HP per difficulty: Easy 200, Normal 150, Hard 100 ----
+check('castle HP easy 200', createWorld('easy').castleHp === 200 && castleMaxHp({ difficulty: 'easy' }) === 200);
+check('castle HP normal 150', createWorld('normal').castleHp === 150);
+check('castle HP hard 100', createWorld('hard').castleHp === 100);
+
+// ---- Boss at the wall: stays and smashes the gate every smashS until killed ----
+{
+  const w = fresh();
+  const boss = spawnEnemy(w, 'boss', 'fire', 0);
+  boss.pos.z = CONFIG.FIELD.wallZ - 0.01;
+  runEnemies(w, 0.05);
+  check('boss hits the wall', w.castleHp === HP - WALL.boss && boss.state === 'smash');
+  check('boss stays at the wall', w.enemies.includes(boss) && boss.pos.z === CONFIG.FIELD.wallZ);
+  runEnemies(w, CONFIG.BOSS.smashS);
+  check('boss smashes again', w.castleHp === HP - 2 * WALL.boss, String(w.castleHp));
 }
 
 // ---- Boss: element swap every 5 s with a 1.5 s warning ----
@@ -290,15 +312,30 @@ function runEnemies(world: World, seconds: number): void {
   update(lose, 0.05);
   check('castle at 0 HP loses', lose.castleHp === 0 && lose.phase === 'LOSE');
 
-  // Survive the round: the "player" clears the field every frame, so no damage -> 3 clean waves.
+  // Survive the round: the "player" clears the field every frame (boss too), so no damage -> 3 clean waves.
   const win = fresh();
   while (win.phase === 'PLAYING') {
     update(win, 1 / 60);
-    win.enemies = win.enemies.filter((e) => e.type === 'boss');
-    for (const e of win.enemies) e.pos.z = CONFIG.FIELD.spawnZ; // boss never arrives
+    win.enemies = [];
   }
   check('surviving 90 s wins', win.phase === 'WIN' && win.time >= CONFIG.ROUND_SECONDS);
   check('3 clean waves = +1500', win.score === 3 * CONFIG.CLEAN_WAVE_BONUS, `score ${win.score}`);
+
+  // The clock can't end the round while the boss lives: it must be killed.
+  const overtime = fresh();
+  overtime.castleHp = Infinity;
+  while (overtime.time < CONFIG.ROUND_SECONDS + 5) {
+    update(overtime, 1 / 60);
+    overtime.enemies = overtime.enemies.filter((e) => e.type === 'boss');
+  }
+  const lateBoss = overtime.enemies.find((e) => e.type === 'boss');
+  check('boss alive = no win at 90 s', overtime.phase === 'PLAYING' && lateBoss !== undefined);
+  if (lateBoss) lateBoss.hp = 1;
+  cast(overtime, 'v', lateBoss ?? null);
+  cast(overtime, 'C', lateBoss ?? null);
+  cast(overtime, 'L', lateBoss ?? null);
+  update(overtime, 0.01);
+  check('killing the boss in overtime wins', overtime.phase === 'WIN');
 
   // Damage in wave 1 loses only that wave's bonus.
   const hurt = fresh();

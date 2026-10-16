@@ -6,6 +6,8 @@
 //               lightning cooldown, and the palm = shield reminder
 import { CONFIG } from '../config.ts';
 import type { World } from '../game/types.ts';
+import { castleMaxHp } from '../game/difficulty.ts';
+import { bossAlive } from '../game/world.ts';
 import { FONT_TEXT, FONT_TITLE } from './fonts.ts';
 import { drawElementIcon, drawPalm, drawSigil, ELEMENT_CSS, GOLD, roundRect, type SigilShape } from './icons.ts';
 
@@ -51,7 +53,7 @@ function drawCastleHp(ctx: CanvasRenderingContext2D, world: World, s: number, no
   ctx.fillStyle = '#0D0B24';
   ctx.fillRect(ix + 10 * s, iy + 20 * s, 6 * s, 10 * s);
 
-  const frac = Math.max(0, world.castleHp / CONFIG.CASTLE_HP);
+  const frac = Math.max(0, world.castleHp / castleMaxHp(world));
   const bx = x + 52 * s;
   const by = y + 31 * s;
   const bw = pw - 66 * s;
@@ -61,7 +63,7 @@ function drawCastleHp(ctx: CanvasRenderingContext2D, world: World, s: number, no
   ctx.textAlign = 'left';
   ctx.fillText('CASTLE', bx, y + 17 * s);
   ctx.textAlign = 'right';
-  ctx.fillText(`${Math.ceil(world.castleHp)} / ${CONFIG.CASTLE_HP}`, bx + bw, y + 17 * s);
+  ctx.fillText(`${Math.ceil(world.castleHp)} / ${castleMaxHp(world)}`, bx + bw, y + 17 * s);
 
   ctx.fillStyle = 'rgba(255,255,255,0.12)';
   ctx.fillRect(bx, by, bw, bh);
@@ -86,11 +88,13 @@ function drawClock(ctx: CanvasRenderingContext2D, world: World, s: number, w: nu
   panel(ctx, x, y, pw, ph, s);
   ctx.textAlign = 'center';
   ctx.font = `700 ${30 * s}px ${FONT_TITLE}`;
+  // Clock ran out but the boss still lives: the round goes on until it is killed.
+  const overtime = left <= 0 && bossAlive(world);
   ctx.fillStyle = left <= 10 ? '#ff6a5a' : '#ffffff';
-  ctx.fillText(`${m}:${String(sec).padStart(2, '0')}`, w / 2, y + 25 * s);
+  ctx.fillText(overtime ? 'BOSS!' : `${m}:${String(sec).padStart(2, '0')}`, w / 2, y + 25 * s);
   ctx.font = `${14 * s}px ${FONT_TITLE}`;
   ctx.fillStyle = GOLD;
-  ctx.fillText(world.bossSpawned && !world.bossDefeated ? 'BOSS WAVE' : `WAVE ${world.wave} / 3`, w / 2, y + 51 * s);
+  ctx.fillText(overtime ? 'KILL IT TO WIN' : bossAlive(world) ? 'BOSS WAVE' : `WAVE ${world.wave} / 3`, w / 2, y + 51 * s);
 }
 
 function drawScore(ctx: CanvasRenderingContext2D, world: World, s: number, w: number) {

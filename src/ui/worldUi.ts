@@ -86,8 +86,8 @@ export function createWorldUi() {
       for (const e of events) {
         if (e.type === 'floatText') addText(e, now);
         else if (e.type === 'castleHit') hitGlowAt = now;
-        else if (e.type === 'waveStart') banner = { text: `WAVE ${e.wave}`, sub: e.wave === 1 ? 'Draw the sigil that beats each enemy' : e.wave === 2 ? 'Birds incoming!' : 'Warlocks: open your palm to block', color: GOLD, born: now };
-        else if (e.type === 'bossArrive') banner = { text: 'BOSS INCOMING', sub: 'It changes element - watch the warning!', color: '#ff7a6a', born: now };
+        else if (e.type === 'waveStart') banner = { text: `WAVE ${e.wave}`, sub: e.wave === 1 ? 'Draw the sigil that beats each enemy' : e.wave === 2 ? 'Ghost horses incoming - they gallop fast!' : 'Skeleton archers: open your palm to block their arrows', color: GOLD, born: now };
+        else if (e.type === 'bossArrive') banner = { text: 'BOSS INCOMING', sub: 'Kill it to win! It changes element - watch the warning', color: '#ff7a6a', born: now };
         else if (e.type === 'cleanWave') banner = { text: 'PERFECT DEFENSE', sub: `+${e.bonus}`, color: '#6fe05a', born: now };
       }
     },
@@ -143,7 +143,7 @@ export function createWorldUi() {
 
   function drawDangerRing(ctx: CanvasRenderingContext2D, e: Enemy, view: View, now: number, s: number) {
     const distToWall = CONFIG.FIELD.wallZ - e.pos.z;
-    if (distToWall > CONFIG.DANGER_DIST || e.type === 'bird') return;
+    if (distToWall > CONFIG.DANGER_DIST) return;
     const feet = view.project(e, 0);
     if (!feet) return;
     const urgency = 1 - Math.max(0, distToWall) / CONFIG.DANGER_DIST; // 0..1

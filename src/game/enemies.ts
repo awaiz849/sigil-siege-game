@@ -1,9 +1,9 @@
 // Enemy behaviour: walking to the wall, wall damage, birds diving, warlock charge/blast,
-// boss element swaps. Pure logic on the World; no drawing.
+// boss element swaps and the boss smashing the gate. Pure logic on the World; no drawing.
 import { CONFIG } from '../config.ts';
 import type { Element, Enemy, EnemyType, World } from './types.ts';
 import { ELEMENTS, damageCastle, pick } from './world.ts';
-import { scaledSpeed } from './difficulty.ts';
+import { scaledSpeed, wallDamage } from './difficulty.ts';
 
 /** Base stats (Normal difficulty) per enemy type. */
 const STATS: Record<EnemyType, { hp: number; speed: number }> = {
@@ -68,6 +68,10 @@ export function updateEnemies(world: World, dt: number): void {
       updateWarlockCasting(world, enemy, dt);
       continue;
     }
+    if (enemy.state === 'smash') {
+      updateBossSmash(world, enemy, dt);
+      continue;
+    }
 
     // Walk toward the wall (+z).
     enemy.pos.z += enemy.speed * dt;
@@ -78,8 +82,15 @@ export function updateEnemies(world: World, dt: number): void {
     }
 
     if (enemy.pos.z >= CONFIG.FIELD.wallZ) {
-      damageCastle(world, enemy.id, CONFIG.WALL_HIT_DAMAGE[enemy.type], 'wall');
-      removeEnemy(world, enemy.id);
+      damageCastle(world, enemy.id, wallDamage(world, enemy.type), 'wall');
+      if (enemy.type === 'boss') {
+        // The boss doesn't vanish: it stays at the gate and keeps smashing until it is killed.
+        enemy.pos.z = CONFIG.FIELD.wallZ;
+        enemy.state = 'smash';
+        enemy.stateT = 0;
+      } else {
+        removeEnemy(world, enemy.id);
+      }
     }
   }
 }
@@ -107,6 +118,15 @@ function updateWarlockCasting(world: World, warlock: Enemy, dt: number): void {
     warlock.stateT = 0;
   } else if (warlock.state === 'recharge' && warlock.stateT >= CONFIG.WARLOCK.rechargeS) {
     startCharge(world, warlock);
+  }
+}
+
+/** Boss at the wall: smashes the gate every smashS seconds. */
+function updateBossSmash(world: World, boss: Enemy, dt: number): void {
+  boss.stateT += dt;
+  if (boss.stateT >= CONFIG.BOSS.smashS) {
+    boss.stateT = 0;
+    damageCastle(world, boss.id, wallDamage(world, 'boss'), 'wall');
   }
 }
 

@@ -6,6 +6,7 @@ import { updateEnemies } from './enemies.ts';
 import { updateSpawns } from './waves.ts';
 import { pushApart } from './crowd.ts';
 import { createRoundLog, logSeconds } from './roundLog.ts';
+import { castleMaxHp } from './difficulty.ts';
 
 export const ELEMENTS: Element[] = ['fire', 'water', 'nature'];
 
@@ -17,7 +18,7 @@ export function createWorld(difficulty: Difficulty = 'normal', seed: number = Da
     phase: 'MENU',
     time: 0,
     wave: 1,
-    castleHp: CONFIG.CASTLE_HP,
+    castleHp: castleMaxHp({ difficulty }),
     score: 0,
     combo: 1,
     lightningCooldown: 0,
@@ -110,12 +111,18 @@ function awardCleanWave(world: World): void {
   world.events.push({ type: 'cleanWave', wave: world.wave, bonus: CONFIG.CLEAN_WAVE_BONUS });
 }
 
-/** Lose at 0 HP; win by surviving the round or killing the boss. */
+/** True while the boss is on the field (the clock can't end the round then). */
+export function bossAlive(world: World): boolean {
+  return world.enemies.some((e) => e.type === 'boss');
+}
+
+/** Lose at 0 HP. Win by killing the boss, or when the clock runs out with no boss on the field.
+ *  While the boss lives the round goes on after the clock hits 0: you must deal with it. */
 function checkEnd(world: World): void {
   if (world.castleHp <= 0) {
     world.phase = 'LOSE';
     world.events.push({ type: 'gameOver', result: 'LOSE' });
-  } else if (world.time >= CONFIG.ROUND_SECONDS || world.bossDefeated) {
+  } else if (world.bossDefeated || (world.time >= CONFIG.ROUND_SECONDS && !bossAlive(world))) {
     awardCleanWave(world); // the last wave counts too
     world.phase = 'WIN';
     world.events.push({ type: 'gameOver', result: 'WIN' });

@@ -22,8 +22,9 @@ export function effectiveness(spell: Element, enemy: Element): number {
   return 1;
 }
 export type EnemyType = 'imp' | 'bird' | 'warlock' | 'boss';
-/** walk = moving to the wall, charge = warlock charging a blast, recharge = warlock waiting after a blast. */
-export type EnemyState = 'walk' | 'charge' | 'recharge';
+/** walk = moving to the wall, charge = warlock charging a blast, recharge = warlock waiting after a blast,
+ *  smash = boss at the wall, hitting the gate. */
+export type EnemyState = 'walk' | 'charge' | 'recharge' | 'smash';
 /** MENU = title / difficulty screen (nothing moves), PLAYING = round running, WIN / LOSE = end banner. */
 export type Phase = 'MENU' | 'PLAYING' | 'WIN' | 'LOSE';
 export type SpellName = 'water' | 'fire' | 'nature' | 'lightning' | 'wind' | 'shield';

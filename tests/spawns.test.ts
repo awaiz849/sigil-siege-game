@@ -1,5 +1,5 @@
 // Spawn simulation: plays full 90 s rounds on each difficulty with a fake player and checks
-// the spawn counts (~27 / 34 / 43 from CLAUDE.md), the boss pause and the enemy cap.
+// the spawn counts (~27 / 34 / 41 from CLAUDE.md), the boss pause and the enemy cap.
 // Run: npm run test:spawns
 import { CONFIG, type Difficulty } from '../src/config.ts';
 import type { World } from '../src/game/types.ts';
@@ -7,7 +7,7 @@ import { createWorld, startRound, takeEvents, update } from '../src/game/world.t
 import { removeEnemy } from '../src/game/enemies.ts';
 
 /** Target spawns per round from CLAUDE.md, and how far off we allow. */
-const TARGET: Record<Difficulty, number> = { easy: 27, normal: 34, hard: 43 };
+const TARGET: Record<Difficulty, number> = { easy: 27, normal: 34, hard: 41 };
 const TOLERANCE = 2;
 const SEEDS = 10;
 const DT = 1 / 60;
@@ -29,14 +29,15 @@ interface RoundLog {
 
 /**
  * One round. The fake player kills every enemy `killAfter` seconds after it spawns
- * (never the boss, so the round lasts the full 90 s). The castle can't fall, so we see every spawn.
+ * (never the boss; we stop at 90 s). The castle can't fall, so we see every spawn.
  * frozen = enemies stop a little way in (clear of the spawn lanes) and never die, so the field fills to the cap.
  */
 function playRound(difficulty: Difficulty, seed: number, killAfter: number, frozen = false): RoundLog {
   const world = startRound(createWorld(difficulty, seed));
   world.castleHp = Infinity;
   const log: RoundLog = { world, spawnTimes: [], maxOnField: 0, bossAt: -1 };
-  while (world.phase === 'PLAYING') {
+  // Stop at the clock: the boss is never killed here, so the round itself would go on.
+  while (world.phase === 'PLAYING' && world.time < CONFIG.ROUND_SECONDS) {
     update(world, DT);
     for (const ev of takeEvents(world)) {
       if (ev.type === 'spawn' && ev.enemyType !== 'boss') log.spawnTimes.push(world.time);

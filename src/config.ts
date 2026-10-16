@@ -43,9 +43,7 @@ export const CONFIG = {
   CLOSED_GAP_RATIO: 0.25,
 
   // ---- Castle and scoring ----
-  CASTLE_HP: 200,
-  /** Damage when a monster reaches the wall, per type (small ones hurt less). */
-  WALL_HIT_DAMAGE: { imp: 5, bird: 5, warlock: 10, boss: 20 } as Record<'imp' | 'bird' | 'warlock' | 'boss', number>,
+  // Castle HP and wall damage depend on the difficulty: see DIFFICULTY below.
   ROUND_SECONDS: 90,
   WAVE_SECONDS: 30,
   KILL_SCORE: 100,
@@ -67,14 +65,19 @@ export const CONFIG = {
   IMP: { hp: 2, speed: 2.3 },
   BIRD: { hp: 1, speed: 4.2 },
   WARLOCK: { hp: 3, speed: 1.8, chargeS: 3, blastDamage: 20, rechargeS: 4 },
-  BOSS: { hp: 8, speed: 1.0, arriveS: 75, elementSwapS: 5, swapWarningS: 1.5 },
+  /** Boss: arrives at arriveS and is fast enough to reach the wall before the clock runs out.
+   *  At the wall it smashes the gate every smashS seconds until it is killed. */
+  BOSS: { hp: 8, speed: 1.8, arriveS: 65, elementSwapS: 5, swapWarningS: 1.5, smashS: 3 },
 
-  // ---- Difficulty multipliers ----
+  // ---- Difficulty ----
+  /** speed / spawnInterval = multipliers on the Normal numbers, maxEnemies = cap on the field,
+   *  castleHp = castle hit points, wallDamage = damage when a monster reaches the wall
+   *  (the boss deals it again every BOSS.smashS while it stands at the wall). */
   DIFFICULTY: {
-    easy: { speed: 0.75, spawnInterval: 1.3, maxEnemies: 5 },
-    normal: { speed: 1, spawnInterval: 1, maxEnemies: 7 },
-    hard: { speed: 1.25, spawnInterval: 0.8, maxEnemies: 9 },
-  } as Record<Difficulty, { speed: number; spawnInterval: number; maxEnemies: number }>,
+    easy: { speed: 0.75, spawnInterval: 1.3, maxEnemies: 5, castleHp: 200, wallDamage: { imp: 5, bird: 5, warlock: 10, boss: 20 } },
+    normal: { speed: 1, spawnInterval: 1, maxEnemies: 7, castleHp: 150, wallDamage: { imp: 10, bird: 10, warlock: 10, boss: 20 } },
+    hard: { speed: 1.5, spawnInterval: 0.8, maxEnemies: 9, castleHp: 100, wallDamage: { imp: 10, bird: 10, warlock: 10, boss: 20 } },
+  } as Record<Difficulty, { speed: number; spawnInterval: number; maxEnemies: number; castleHp: number; wallDamage: Record<'imp' | 'bird' | 'warlock' | 'boss', number> }>,
 
   // ---- Game logic: field, spawning, crowd (src/game) ----
   /** Longest frame step the logic accepts (s); a bigger gap (tab switch) is clamped. */
@@ -98,7 +101,7 @@ export const CONFIG = {
     { imp: 3.6, bird: 8, warlock: 15 },
   ],
   /** After the boss arrives imps come every this many seconds. */
-  AFTER_BOSS_IMP_S: 5,
+  AFTER_BOSS_IMP_S: 4,
   /** Delay before the first spawn of a newly enabled enemy type in a wave. */
   FIRST_SPAWN_DELAY_S: 0,
   /** All spawns pause this long when the boss arrives. */
