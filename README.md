@@ -92,8 +92,11 @@ webcam -> MediaPipe HandLandmarker -> One Euro filter -> finger poses -> stroke
 - **Fonts**: Silkscreen (Jason Kottke) and DotGothic16 (Fontworks), SIL Open Font License 1.1.
   License texts are in `public/fonts/`.
 - **Vite** and **TypeScript** for the build.
-- **3D models** in `public/models/` (when present): source and licence of each file listed here.
-  AI-generated models are made from our own concept images with an image-to-3D tool (name it here).
+- **3D models** in `public/models/`: AI-generated with **Meshy AI** (image/text-to-3D) from our own concept art.
+  `imp.glb` = "Embercloak", `bird.glb` = "Ghostflame Steed", `warlock.glb` = "Bone Ranger",
+  `boss.glb` = "Ironclad Lancer", `wizard.glb` = "Lightning Sorcerer". We converted the FBX exports to GLB
+  ourselves (three.js FBXLoader + meshoptimizer simplifier, ~14k triangles, 1024 px base-colour texture).
+  Used under Meshy's terms for generated assets.
 - **AI assistance**: Claude and Claude Code were used for planning and coding help.
 
 Team Velocity:

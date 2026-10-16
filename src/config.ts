@@ -151,15 +151,22 @@ export const CONFIG = {
   OVERLAY_MAX_PIXEL_RATIO: 2,
   SHADOWS: false,
   /** Real 3D models (GLB). Put files in public/models/; a missing file falls back to the code-built model.
-   *  height = how tall it stands in world units; rotationY = turn so it faces the wall (+z). */
+   *  height = how tall it stands in world units; rotationY = turn so it faces the wall (+z)
+   *  (the wizard faces the field, -z). tint = how the element shows on the model:
+   *  'hue' recolours the texture (fire models: flames turn blue / green), 'glow' adds an element glow. */
   GLB_MODELS: {
-    imp: { file: 'models/imp.glb', height: 3.2, rotationY: 0 },
-    bird: { file: 'models/bird.glb', height: 2.8, rotationY: 0 },
-    warlock: { file: 'models/warlock.glb', height: 3.0, rotationY: 0 },
-    boss: { file: 'models/boss.glb', height: 5.6, rotationY: 0 },
-  } as Record<'imp' | 'bird' | 'warlock' | 'boss', { file: string; height: number; rotationY: number }>,
+    imp: { file: 'models/imp.glb', height: 3.2, rotationY: 0, tint: 'hue' },
+    bird: { file: 'models/bird.glb', height: 2.8, rotationY: 0, tint: 'hue' },
+    warlock: { file: 'models/warlock.glb', height: 3.0, rotationY: 0, tint: 'glow' },
+    boss: { file: 'models/boss.glb', height: 5.6, rotationY: 0, tint: 'glow' },
+    wizard: { file: 'models/wizard.glb', height: 2.3, rotationY: Math.PI, tint: 'none' },
+  } as Record<'imp' | 'bird' | 'warlock' | 'boss' | 'wizard', { file: string; height: number; rotationY: number; tint: 'hue' | 'glow' | 'none' }>,
   /** Give GLB models toon shading so they match the comic look (false = keep their own PBR look). */
   GLB_TOON: true,
+  /** 'hue' tint: degrees to turn the texture's colours per element (the textures are fire-coloured). */
+  GLB_HUE_SHIFT: { fire: 0, water: 180, nature: 90 },
+  /** 'glow' tint: strength of the element glow on the whole model. */
+  GLB_GLOW: 0.16,
   /** Comic ink outlines (post-process): colour, line width in pixels, fade-out distance range. */
   INK: { enabled: true, color: 0x07050f, thickness: 1.2, fadeStart: 30, fadeEnd: 70 },
   /** Glow on emissive things. Turn off first if FPS drops (after shadows). */

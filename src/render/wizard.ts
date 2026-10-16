@@ -2,11 +2,14 @@
 // purple hooded robe with gold trim, a cape, and a glowing orb of magic between his hands.
 // He reacts to the hand pose: idle sway, right arm raised while drawing, both arms thrust
 // forward when a spell is cast, arms spread with a cyan glow for the shield.
+// When public/models/wizard.glb is loaded it replaces the primitive figure (orb, light and
+// rune circle stay); the model then leans into each cast instead of moving its arms.
 import * as THREE from 'three';
 import { toon } from './toon.ts';
 import { onCursor, type Pose } from '../events.ts';
 import { PALETTE } from './palette.ts';
 import { radialTexture } from './environment.ts';
+import { whenGlbLoaded } from './glbModels.ts';
 
 const ROBE = 0x8a45d0;
 const ROBE_DARK = 0x55288a;
@@ -16,6 +19,14 @@ export function createWizard() {
   const root = new THREE.Group();
   const body = new THREE.Group(); // sways while idle
   root.add(body);
+  const figure = new THREE.Group(); // the primitive wizard (hidden when the GLB model loads)
+  body.add(figure);
+  const glbFigure = new THREE.Group(); // the GLB wizard, leans into casts
+  body.add(glbFigure);
+  whenGlbLoaded('wizard', (model) => {
+    figure.visible = false;
+    glbFigure.add(model);
+  });
 
   const robe = toon({ color: ROBE, flatShading: true, roughness: 0.8 });
   const robeDark = toon({ color: ROBE_DARK, flatShading: true, roughness: 0.9, side: THREE.DoubleSide });
@@ -35,14 +46,14 @@ export function createWizard() {
   belt.position.y = 1.0;
   const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.14, 0.06), gold);
   buckle.position.set(0, 1.0, -0.35);
-  body.add(skirt, hem, torso, belt, buckle);
+  figure.add(skirt, hem, torso, belt, buckle);
 
   // Shoulder pads (gold) and a cape down the back (the side the camera sees).
   for (const x of [-0.36, 0.36]) {
     const pad = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), gold);
     pad.scale.set(1.2, 0.6, 1.1);
     pad.position.set(x, 1.6, 0);
-    body.add(pad);
+    figure.add(pad);
   }
   const capeShape = new THREE.Shape();
   capeShape.moveTo(-0.38, 0);
@@ -54,7 +65,7 @@ export function createWizard() {
   cape.rotation.x = 0.12;
   const capeTrim = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.06, 0.02), gold);
   capeTrim.position.set(0, 0.2, 0.3);
-  body.add(cape, capeTrim);
+  figure.add(cape, capeTrim);
 
   // Head: face, white beard, and a big pointed hood.
   const head = new THREE.Group();
@@ -71,7 +82,7 @@ export function createWizard() {
   const hoodTrim = new THREE.Mesh(new THREE.TorusGeometry(0.27, 0.035, 6, 16), gold);
   hoodTrim.position.set(0, -0.02, -0.12);
   head.add(face, beard, hood, hoodTip, hoodTrim);
-  body.add(head);
+  figure.add(head);
 
   // Arms: sleeve + hand, pivoting at the shoulder.
   function arm(side: number) {
@@ -85,7 +96,7 @@ export function createWizard() {
     const hand = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), skin);
     hand.position.y = -0.7;
     pivot.add(sleeve, cuff, hand);
-    body.add(pivot);
+    figure.add(pivot);
     return { pivot, hand };
   }
   const left = arm(-1);
@@ -151,6 +162,9 @@ export function createWizard() {
       right.pivot.rotation.x += (rx - right.pivot.rotation.x) * k;
       left.pivot.rotation.z += (lz - left.pivot.rotation.z) * k;
       right.pivot.rotation.z += (rz - right.pivot.rotation.z) * k;
+      // GLB wizard: lean forward (toward the field, -z) on a cast, a little while drawing.
+      const lean = -(castT * 0.22 + (pose === 'point' ? 0.06 : 0));
+      glbFigure.rotation.x += (lean - glbFigure.rotation.x) * k;
 
       // Orb: rides on the right hand while drawing, floats in front otherwise; flares on cast.
       if (pose === 'point') {
