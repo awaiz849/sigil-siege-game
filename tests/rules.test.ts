@@ -21,6 +21,7 @@ function check(name: string, ok: boolean, detail = ''): void {
   }
 }
 const near = (a: number, b: number) => Math.abs(a - b) < 1e-6;
+const near_ = (a: number, b: number) => Math.abs(a - b) < 1e-3;
 
 /** Empty world in a running round: no spawns happen because we never call update on it (only updateEnemies). */
 const fresh = (): World => startRound(createWorld('normal', 42));
@@ -382,6 +383,72 @@ check('castle HP hard 100', createWorld('hard').castleHp === 100);
   check('mana refills per second', Math.abs(regen.mana - CONFIG.DIFFICULTY.normal.manaRegen) < 0.5, String(regen.mana));
   for (let i = 0; i < 1200; i++) update(regen, 1 / 60);
   check('mana capped at max', regen.mana === M.max);
+}
+
+// ---- Level 2: the Grand Warden's spells (U frost, Z flame, peak thorn, M arcane, line time warp, palm tome) ----
+{
+  const W = CONFIG.WARDEN;
+  const warden = (): World => startRound(createWorld('normal', 42, 'warden'));
+
+  // Frost (U, water): hits the target, splashes monsters close to it, not ones far away.
+  const w = warden();
+  const target = spawnEnemy(w, 'imp', 'nature', 0);
+  const near = spawnEnemy(w, 'imp', 'nature', 2);
+  const far = spawnEnemy(w, 'imp', 'nature', 6);
+  for (const e of [target, near, far]) e.hp = 5;
+  const r = cast(w, 'U', target);
+  check('warden U = frost', r.spell === 'frost' && r.kind === 'hit');
+  check('frost hits target (water vs nature = x1)', near_(target.hp, 4));
+  check('frost splashes nearby', near_(near.hp, 5 - W.splashDamage) && far.hp === 5, `${near.hp} ${far.hp}`);
+  check('wizard shapes do nothing for the warden', cast(w, 'C', target).kind === 'fizzle');
+
+  // Flame (Z, fire): hit now, burn later.
+  const f = warden();
+  const imp = spawnEnemy(f, 'imp', 'nature', 0); // fire beats nature: 2 + 2
+  imp.hp = 6;
+  cast(f, 'Z', imp);
+  check('flame hits (super effective)', imp.hp === 4 && imp.burnT === W.burnS);
+  for (let t = 0; t < W.burnS + 0.1; t += 0.05) update(f, 0.05);
+  check('flame burns again', imp.hp === 4 - W.burnDamage * 2 && imp.burnT === 0, String(imp.hp));
+
+  // Thorn (peak, nature): hit + rooted (stunned) so it stops and takes x2.
+  const t = warden();
+  const horse = spawnEnemy(t, 'bird', 'water', 0);
+  horse.hp = 10;
+  cast(t, 'peak', horse);
+  check('thorn roots the target', horse.stunT === W.rootS && horse.hp === 8);
+
+  // Arcane rain (M): hits all, slows the survivors, uses the "hits all" cooldown.
+  const a = warden();
+  const a1 = spawnEnemy(a, 'imp', 'fire', -3);
+  const a2 = spawnEnemy(a, 'imp', 'water', 3);
+  a1.hp = a2.hp = 3;
+  const ar = cast(a, 'M', null);
+  check('arcane hits every monster', ar.spell === 'arcane' && a1.hp === 2 && a2.hp === 2);
+  check('arcane slows them', a1.slowT === W.arcaneSlowS && a.lightningCooldown === W.arcaneCooldownS);
+  const z0 = a1.pos.z;
+  runEnemies(a, 1);
+  check('slowed monsters walk at half speed', near_(a1.pos.z - z0, CONFIG.IMP.speed * W.slowFactor), String(a1.pos.z - z0));
+
+  // Time warp (line): walkers slowed for timewarpS, cooldown; nobody walking = miss.
+  const tw = warden();
+  const walker = spawnEnemy(tw, 'imp', 'fire', 0);
+  const twr = cast(tw, 'line', null);
+  check('line = time warp for the warden', twr.spell === 'timewarp' && walker.slowT === W.timewarpS && tw.windCooldown === W.timewarpCooldownS);
+
+  // Eternal tome (palm): castle immune for tomeS, archers blocked, cooldown.
+  const tm = warden();
+  const archer = spawnEnemy(tm, 'warlock', 'fire', 0);
+  archer.state = 'charge';
+  const tr = castShield(tm);
+  check('palm = eternal tome', tr.spell === 'tome' && tr.kind === 'block' && archer.stunT > 0 && tm.immuneT === W.tomeS);
+  const hpBefore = tm.castleHp;
+  const crasher = spawnEnemy(tm, 'imp', 'fire', 3);
+  crasher.pos.z = CONFIG.FIELD.wallZ - 0.01;
+  update(tm, 0.05);
+  check('tome: castle takes no damage', tm.castleHp === hpBefore);
+  check('tome on cooldown', castShield(tm).kind === 'cooldown');
+  check('counter-shape hint uses the warden shapes', counterShape('fire', 'warden') === 'U' && counterShape('fire') === 'C');
 }
 
 // ---- Targeting: nearest enemy on SCREEN to the stroke centre ----

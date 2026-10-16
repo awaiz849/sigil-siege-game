@@ -28,6 +28,8 @@ export function spawnEnemy(world: World, type: EnemyType, element: Element, x: n
     state: 'walk',
     stateT: 0,
     stunT: 0,
+    slowT: 0,
+    burnT: 0,
     hint: false,
     nextElement: null,
     swapT: 0,
@@ -56,6 +58,7 @@ export function updateEnemies(world: World, dt: number): void {
   // Copy the list: enemies that reach the wall are removed while we loop.
   for (const enemy of world.enemies.slice()) {
     enemy.age += dt;
+    enemy.slowT = Math.max(0, enemy.slowT - dt);
     if (enemy.type === 'boss') updateBossElement(world, enemy, dt);
 
     // Stunned enemies freeze completely (no walking, no charging).
@@ -74,7 +77,7 @@ export function updateEnemies(world: World, dt: number): void {
     }
 
     // Walk toward the wall (+z).
-    enemy.pos.z += enemy.speed * dt;
+    enemy.pos.z += enemy.speed * dt * (enemy.slowT > 0 ? CONFIG.WARDEN.slowFactor : 1);
     if (enemy.type === 'bird') updateBirdHeight(enemy);
     if (enemy.type === 'warlock' && enemy.pos.z >= warlockStopZ()) {
       enemy.pos.z = warlockStopZ();

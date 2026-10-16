@@ -1,8 +1,9 @@
 // Spells: targeting, damage rules, combo, MISS / FIZZLE, lightning and wind cooldowns, and the shield.
+// Level 2: the Grand Warden casts his own spells from his own shapes (HERO_SPELLS).
 // Every cast returns a SpellResult and adds floating-text events, so UI and sound can react. No drawing here.
 import { CONFIG } from '../config.ts';
 import { BEATS, effectiveness } from './types.ts';
-import type { Element, Enemy, FloatText, SpellName, Vec3, World } from './types.ts';
+import type { Element, Enemy, FloatText, Hero, SpellName, Vec3, World } from './types.ts';
 import { removeEnemy } from './enemies.ts';
 import { logCast } from './roundLog.ts';
 
@@ -15,10 +16,29 @@ export const SIGIL_SPELLS: Record<string, Exclude<SpellName, 'shield' | 'meteor'
   line: 'wind',
 };
 
+/** The Grand Warden's shapes (level 2): cousins of the wizard's. */
+export const WARDEN_SPELLS: Record<string, SpellName> = {
+  U: 'frost',
+  Z: 'flame',
+  peak: 'thorn',
+  M: 'arcane',
+  line: 'timewarp',
+};
+
+/** Shape -> spell for each hero. */
+export const HERO_SPELLS: Record<Hero, Record<string, SpellName>> = { wizard: SIGIL_SPELLS, warden: WARDEN_SPELLS };
+
+/** The element of each elemental spell (both heroes). */
+export const SPELL_ELEMENT: Partial<Record<SpellName, Element>> = {
+  water: 'water', fire: 'fire', nature: 'nature',
+  frost: 'water', flame: 'fire', thorn: 'nature',
+};
+
 /** The shape to draw against an enemy of this element (the spell that beats it). Used for hints. */
-export function counterShape(element: Element): string {
-  const spell = (Object.keys(BEATS) as Element[]).find((s) => BEATS[s] === element)!;
-  return Object.keys(SIGIL_SPELLS).find((shape) => SIGIL_SPELLS[shape] === spell)!;
+export function counterShape(element: Element, hero: Hero = 'wizard'): string {
+  const beater = (Object.keys(BEATS) as Element[]).find((s) => BEATS[s] === element)!;
+  const spells = HERO_SPELLS[hero];
+  return Object.keys(spells).find((shape) => SPELL_ELEMENT[spells[shape]] === beater)!;
 }
 
 /** Words shown as floating text. */
@@ -31,6 +51,11 @@ export const TEXT = {
   blocked: 'BLOCKED!',
   wind: 'WIND!',
   noMana: 'NO MANA',
+  burn: 'BURN!',
+  rooted: 'ROOTED',
+  slowed: 'SLOWED',
+  timewarp: 'TIME WARP!',
+  tome: 'ETERNAL TOME!',
   perfect: (bonus: number) => `PERFECT SIGIL! +${bonus}`,
   meteor: 'METEOR!',
   meteorCharging: (percent: number) => `METEOR ${percent}%`,
@@ -146,22 +171,118 @@ function rewardPerfect(world: World, r: SpellResult): void {
 }
 
 function castShape(world: World, shape: string | null, targetId: number | null): SpellResult {
-  const spell = shape ? SIGIL_SPELLS[shape] : undefined;
+  const spell = shape ? HERO_SPELLS[world.hero][shape] : undefined;
   if (!spell) {
     world.mana = Math.max(0, world.mana - CONFIG.MANA.fizzle);
     return fail(world, 'fizzle', null);
   }
   if (spell === 'lightning') return castLightning(world);
   if (spell === 'wind') return castWind(world);
+  if (spell === 'arcane') return castArcane(world);
+  if (spell === 'timewarp') return castTimewarp(world);
 
-  if (world.mana < CONFIG.MANA.cost[spell]) return noMana(world, spell);
-  world.mana -= CONFIG.MANA.cost[spell];
+  const cost = manaCost(spell);
+  if (world.mana < cost) return noMana(world, spell);
+  world.mana -= cost;
   const target = world.enemies.find((e) => e.id === targetId);
   if (!target) return fail(world, 'miss', spell); // the mana is spent anyway
-  const hit = damageEnemy(world, target, spell);
+  const element = SPELL_ELEMENT[spell] ?? null;
+  const hit = damageEnemy(world, target, element);
   // The right element pays back part of its cost.
   if (hit.effect === 'strong') world.mana = Math.min(CONFIG.MANA.max, world.mana + CONFIG.MANA.strongRefund);
-  return finish(world, spell, [hit]);
+  const hits = [hit];
+  const extra: FloatText[] = [];
+  const W = CONFIG.WARDEN;
+  if (spell === 'frost') {
+    // Frost nova: icy splash on every other monster close to the target.
+    for (const e of world.enemies.slice()) {
+      if (e.id === target.id || Math.hypot(e.pos.x - hit.pos.x, e.pos.z - hit.pos.z) > W.frostRadius) continue;
+      hits.push(damageEnemy(world, e, 'water', W.splashDamage));
+    }
+  } else if (spell === 'flame' && !hit.killed) {
+    target.burnT = W.burnS; // burns again in a moment
+    extra.push({ text: TEXT.burn, pos: { ...target.pos }, tone: 'great' });
+  } else if (spell === 'thorn' && !hit.killed) {
+    target.stunT = Math.max(target.stunT, W.rootS); // rooted: frozen and takes x2 damage
+    extra.push({ text: TEXT.rooted, pos: { ...target.pos }, tone: 'great' });
+  }
+  const r = finish(world, spell, hits);
+  for (const t of extra) {
+    r.texts.push(t);
+    world.events.push({ type: 'floatText', ...t });
+  }
+  return r;
+}
+
+/** Mana cost of a spell (CONFIG.MANA.cost). */
+function manaCost(spell: SpellName): number {
+  return (CONFIG.MANA.cost as Record<string, number>)[spell] ?? 0;
+}
+
+/** Arcane rain (warden's M): 1 damage to every monster and slows the survivors; shares the
+ *  "hits all" cooldown slot with lightning. Casting on cooldown costs nothing. */
+function castArcane(world: World): SpellResult {
+  if (world.lightningCooldown > 0) {
+    const left = world.lightningCooldown;
+    return result(world, 'cooldown', 'arcane', { cooldownLeft: left }, [{ text: TEXT.cooldown('arcane', left), pos: null, tone: 'info' }]);
+  }
+  if (world.enemies.length === 0) return fail(world, 'miss', 'arcane');
+  if (world.mana < manaCost('arcane')) return noMana(world, 'arcane');
+  world.mana -= manaCost('arcane');
+  world.lightningCooldown = CONFIG.WARDEN.arcaneCooldownS;
+  const hits = world.enemies.slice().map((e) => damageEnemy(world, e, null));
+  for (const e of world.enemies) e.slowT = Math.max(e.slowT, CONFIG.WARDEN.arcaneSlowS);
+  return finish(world, 'arcane', hits);
+}
+
+/** Time warp (warden's line): every walking monster moves at half speed for a while.
+ *  Shares the wind cooldown slot. Nobody walking = MISS. */
+function castTimewarp(world: World): SpellResult {
+  if (world.windCooldown > 0) {
+    const left = world.windCooldown;
+    return result(world, 'cooldown', 'timewarp', { cooldownLeft: left }, [{ text: TEXT.cooldown('timewarp', left), pos: null, tone: 'info' }]);
+  }
+  const walkers = world.enemies.filter((e) => e.state === 'walk');
+  if (walkers.length === 0) return fail(world, 'miss', 'timewarp');
+  if (world.mana < manaCost('timewarp')) return noMana(world, 'timewarp');
+  world.mana -= manaCost('timewarp');
+  world.windCooldown = CONFIG.WARDEN.timewarpCooldownS;
+  for (const e of walkers) e.slowT = Math.max(e.slowT, CONFIG.WARDEN.timewarpS);
+  return result(world, 'push', 'timewarp', { pushedIds: walkers.map((e) => e.id) }, [{ text: TEXT.timewarp, pos: null, tone: 'good' }]);
+}
+
+/** Eternal tome (warden's open palm): the castle takes no damage for a few seconds and every
+ *  charging archer is blocked and stunned. Always useful, so never a MISS; long cooldown. */
+function castTome(world: World): SpellResult {
+  if (world.tomeCooldown > 0) {
+    const left = world.tomeCooldown;
+    return result(world, 'cooldown', 'tome', { cooldownLeft: left }, [{ text: TEXT.cooldown('tome', left), pos: null, tone: 'info' }]);
+  }
+  if (world.mana < manaCost('tome')) return noMana(world, 'tome');
+  world.mana -= manaCost('tome');
+  world.tomeCooldown = CONFIG.WARDEN.tomeCooldownS;
+  world.immuneT = CONFIG.WARDEN.tomeS;
+  const charging = world.enemies.filter((e) => e.type === 'warlock' && e.state === 'charge' && e.stunT === 0);
+  for (const warlock of charging) {
+    warlock.state = 'recharge';
+    warlock.stateT = 0;
+    warlock.stunT = CONFIG.SHIELD_STUN_S;
+  }
+  const texts: FloatText[] = [{ text: TEXT.tome, pos: null, tone: 'great' }, ...charging.map((w) => ({ text: TEXT.blocked, pos: { ...w.pos }, tone: 'good' as const }))];
+  return result(world, 'block', 'tome', { blockedIds: charging.map((w) => w.id) }, texts);
+}
+
+/** Soul-flame burns: when a burn runs out it deals its extra fire damage (called by update()). */
+export function updateBurns(world: World, dt: number): void {
+  for (const e of world.enemies.slice()) {
+    if (e.burnT <= 0) continue;
+    e.burnT -= dt;
+    if (e.burnT > 0) continue;
+    e.burnT = 0;
+    const hit = damageEnemy(world, e, 'fire', CONFIG.WARDEN.burnDamage);
+    for (const t of hitTexts(hit)) world.events.push({ type: 'floatText', ...t });
+    world.events.push({ type: 'burn', enemyId: e.id, pos: hit.pos, killed: hit.killed });
+  }
 }
 
 /** Not enough mana: nothing happens, no combo penalty. */
@@ -209,6 +330,7 @@ function castWind(world: World): SpellResult {
 /** Shield (open palm): blocks every charging warlock and stuns each one. */
 export function castShield(world: World): SpellResult {
   if (world.phase !== 'PLAYING') return result(world, 'ignored', 'shield');
+  if (world.hero === 'warden') return castTome(world);
   const charging = world.enemies.filter((e) => e.type === 'warlock' && e.state === 'charge' && e.stunT === 0);
   if (charging.length === 0) return fail(world, 'miss', 'shield');
   if (world.mana < CONFIG.MANA.cost.shield) return noMana(world, 'shield');

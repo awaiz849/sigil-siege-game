@@ -76,7 +76,7 @@ export const CONFIG = {
    *  The shield only costs mana when it actually blocks; a fizzle (shape not recognized) costs a little. */
   MANA: {
     max: 100,
-    cost: { water: 20, fire: 20, nature: 20, lightning: 40, wind: 30, shield: 15 },
+    cost: { water: 20, fire: 20, nature: 20, lightning: 40, wind: 30, shield: 15, frost: 22, flame: 22, thorn: 22, arcane: 40, timewarp: 30, tome: 30 },
     strongRefund: 12,
     fizzle: 6,
   },
@@ -84,6 +84,15 @@ export const CONFIG = {
    *  a throw drops a meteor on the monster nearest the aim point and damages everything within
    *  radius (world units). Meteor kills don't refill the meter. */
   METEOR: { meterMax: 100, perKill: 10, perPerfect: 10, damage: 3, radius: 6 },
+  /** Level 2: the GRAND WARDEN's spells (shapes: U frost, Z flame, peak thorn, M arcane, line time warp,
+   *  open palm eternal tome). frost: water hit + splash of splashDamage within frostRadius.
+   *  flame: fire hit, then burnDamage more after burnS. thorn: nature hit + rooted (stunned) rootS.
+   *  arcane: 1 damage to all + slowed arcaneSlowS, cooldown. timewarp: walkers move at slowFactor speed
+   *  for timewarpS, cooldown. tome: blocks charging archers + the castle takes no damage for tomeS, cooldown. */
+  WARDEN: {
+    frostRadius: 3.5, splashDamage: 1, burnS: 2, burnDamage: 1, rootS: 1.5, slowFactor: 0.5,
+    arcaneCooldownS: 10, arcaneSlowS: 3, timewarpS: 5, timewarpCooldownS: 14, tomeS: 3, tomeCooldownS: 20,
+  },
   LIGHTNING_COOLDOWN_S: 10,
   SHIELD_STUN_S: 3,
   /** WIND (drawn line): pushes walking enemies this many units back, then a cooldown. */

@@ -1,9 +1,10 @@
 // The World: one plain object holding the whole game state, in world units.
 // Logic updates it; the renderer and UI read it every frame. No drawing here.
 import { CONFIG, type Difficulty } from '../config.ts';
-import type { Element, GameEvent, World } from './types.ts';
+import type { Element, GameEvent, Hero, World } from './types.ts';
 import { updateEnemies } from './enemies.ts';
 import { updateSpawns } from './waves.ts';
+import { updateBurns } from './spells.ts';
 import { pushApart } from './crowd.ts';
 import { createRoundLog, logSeconds } from './roundLog.ts';
 import { castleMaxHp } from './difficulty.ts';
@@ -12,9 +13,12 @@ export const ELEMENTS: Element[] = ['fire', 'water', 'nature'];
 
 /** A fresh world on the given difficulty, waiting in the menu. Call startRound() to play.
  *  Pass a seed for reproducible tests. */
-export function createWorld(difficulty: Difficulty = 'normal', seed: number = Date.now()): World {
+export function createWorld(difficulty: Difficulty = 'normal', seed: number = Date.now(), hero: Hero = 'wizard'): World {
   return {
     difficulty,
+    hero,
+    immuneT: 0,
+    tomeCooldown: 0,
     phase: 'MENU',
     time: 0,
     wave: 1,
@@ -69,6 +73,11 @@ export function pick<T>(world: World, items: readonly T[]): T {
 
 /** Damage the castle; ends the round at 0 HP. */
 export function damageCastle(world: World, enemyId: number, damage: number, cause: 'wall' | 'blast'): void {
+  // The Grand Warden's eternal tome: the castle shrugs it off.
+  if (world.immuneT > 0) {
+    world.events.push({ type: 'floatText', text: 'IMMUNE!', pos: null, tone: 'good' });
+    return;
+  }
   world.castleHp = Math.max(0, world.castleHp - damage);
   world.waveDamaged = true;
   world.log.damageByWave[world.wave - 1] += damage;
@@ -89,6 +98,9 @@ export function update(world: World, dt: number): void {
   world.time += dt;
   world.lightningCooldown = Math.max(0, world.lightningCooldown - dt);
   world.windCooldown = Math.max(0, world.windCooldown - dt);
+  world.immuneT = Math.max(0, world.immuneT - dt);
+  world.tomeCooldown = Math.max(0, world.tomeCooldown - dt);
+  updateBurns(world, dt);
   world.mana = Math.min(CONFIG.MANA.max, world.mana + CONFIG.DIFFICULTY[world.difficulty].manaRegen * dt);
   updateWave(world);
   updateSpawns(world);

@@ -27,7 +27,13 @@ export type EnemyType = 'imp' | 'bird' | 'warlock' | 'boss';
 export type EnemyState = 'walk' | 'charge' | 'recharge' | 'smash';
 /** MENU = title / difficulty screen (nothing moves), PLAYING = round running, WIN / LOSE = end banner. */
 export type Phase = 'MENU' | 'PLAYING' | 'WIN' | 'LOSE';
-export type SpellName = 'water' | 'fire' | 'nature' | 'lightning' | 'wind' | 'shield' | 'meteor';
+/** Level 1 = the wizard, level 2 = the Grand Warden (his own shapes and spells). */
+export type Hero = 'wizard' | 'warden';
+/** Wizard: water fire nature lightning wind shield. Warden: frost flame thorn arcane timewarp tome. Both: meteor. */
+export type SpellName =
+  | 'water' | 'fire' | 'nature' | 'lightning' | 'wind' | 'shield'
+  | 'frost' | 'flame' | 'thorn' | 'arcane' | 'timewarp' | 'tome'
+  | 'meteor';
 
 /** World units, three.js axes: x = sideways, y = height, z = depth (negative = out in the field). */
 export interface Vec3 {
@@ -59,6 +65,10 @@ export interface Enemy {
   swapT: number;
   /** Seconds since spawn. */
   age: number;
+  /** Seconds of slow left (warden's arcane rain / time warp): moves at WARDEN.slowFactor speed. */
+  slowT: number;
+  /** Seconds until a burn (warden's soul flame) deals its extra fire damage (0 = not burning). */
+  burnT: number;
 }
 
 /** Floating text for the UI ("SUPER EFFECTIVE!", "MISS", "+300"...).
@@ -73,6 +83,7 @@ export interface FloatText {
 /** Things that happened in the game, for UI, camera shake and sound. Read them with takeEvents(). */
 export type GameEvent =
   | { type: 'waveStart'; wave: number }
+  | { type: 'burn'; enemyId: number; pos: Vec3; killed: boolean }
   | { type: 'cleanWave'; wave: number; bonus: number }
   | { type: 'spawn'; enemyId: number; enemyType: EnemyType }
   | { type: 'castleHit'; enemyId: number; damage: number; cause: 'wall' | 'blast' }
@@ -99,6 +110,12 @@ export interface SpawnState {
 
 export interface World {
   difficulty: Difficulty;
+  /** Which hero is on the wall (level 1 wizard, level 2 Grand Warden): his shapes and spells. */
+  hero: Hero;
+  /** Seconds the castle can't be damaged (warden's eternal tome). */
+  immuneT: number;
+  /** Seconds until the eternal tome can be used again. */
+  tomeCooldown: number;
   phase: Phase;
   /** Seconds since the round started. */
   time: number;
