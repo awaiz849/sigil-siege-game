@@ -2,6 +2,15 @@
 
 export type Difficulty = 'easy' | 'normal' | 'hard';
 
+/** One real 3D model file (see GLB_MODELS). */
+export type GlbModelConfig = {
+  file: string;
+  height: number;
+  rotationY: number;
+  tint: 'hue' | 'glow' | 'none';
+  legs?: { hip: number; frontZ: number; backZ: number; legR: number; legX: number; swing: number; strides: number };
+};
+
 export const CONFIG = {
   // ---- Input ----
   /** "poses" = finger poses, "pinch" = thumb-index pinch fallback. */
@@ -157,14 +166,23 @@ export const CONFIG = {
   /** Real 3D models (GLB). Put files in public/models/; a missing file falls back to the code-built model.
    *  height = how tall it stands in world units; rotationY = turn so it faces the wall (+z)
    *  (the wizard faces the field, -z). tint = how the element shows on the model:
-   *  'hue' recolours the texture (fire models: flames turn blue / green), 'glow' adds an element glow. */
+   *  'hue' recolours the texture (fire models: flames turn blue / green), 'glow' adds an element glow.
+   *  legs = horses: the four legs swing in a gallop (vertex shader), measured in the model's own units
+   *  (height 1): hip height, z of the front / back leg pairs, leg radius in z, max |x| of a leg
+   *  (keeps the boss's lance still), swing in radians, gallop speed in strides per second. */
   GLB_MODELS: {
     imp: { file: 'models/imp.glb', height: 3.2, rotationY: 0, tint: 'hue' },
-    bird: { file: 'models/bird.glb', height: 2.8, rotationY: 0, tint: 'hue' },
+    bird: {
+      file: 'models/bird.glb', height: 2.8, rotationY: 0, tint: 'hue',
+      legs: { hip: 0.33, frontZ: 0.32, backZ: -0.19, legR: 0.1, legX: 0.2, swing: 0.55, strides: 2.6 },
+    },
     warlock: { file: 'models/warlock.glb', height: 3.0, rotationY: 0, tint: 'glow' },
-    boss: { file: 'models/boss.glb', height: 5.6, rotationY: 0, tint: 'glow' },
+    boss: {
+      file: 'models/boss.glb', height: 5.6, rotationY: 0, tint: 'glow',
+      legs: { hip: 0.22, frontZ: 0.15, backZ: -0.12, legR: 0.075, legX: 0.125, swing: 0.45, strides: 1.6 },
+    },
     wizard: { file: 'models/wizard.glb', height: 2.3, rotationY: Math.PI, tint: 'none' },
-  } as Record<'imp' | 'bird' | 'warlock' | 'boss' | 'wizard', { file: string; height: number; rotationY: number; tint: 'hue' | 'glow' | 'none' }>,
+  } as Record<'imp' | 'bird' | 'warlock' | 'boss' | 'wizard', GlbModelConfig>,
   /** Give GLB models toon shading so they match the comic look (false = keep their own PBR look). */
   GLB_TOON: true,
   /** 'hue' tint: degrees to turn the texture's colours per element (the textures are fire-coloured). */

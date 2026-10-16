@@ -5,12 +5,13 @@
 // Each GLB is: loaded once at startup, cloned per enemy (SkeletonUtils keeps rigs working),
 // scaled to the height in config, turned to face the wall, given toon shading to match the
 // comic look, and shows its element (recoloured texture or a glow, CONFIG.GLB_MODELS.tint).
-// Our models are static meshes, so the walk is a simple bob/sway done in code; a file with
-// its own walk/idle animation plays that instead.
+// Our models are static meshes (no skeleton), so the walk is a bob/sway done in code, and the
+// horses' legs gallop in the vertex shader (gallopLegs below); a file with its own walk/idle
+// animation plays that instead.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
-import { CONFIG } from '../config.ts';
+import { CONFIG, type GlbModelConfig } from '../config.ts';
 import type { Element, EnemyType } from '../game/types.ts';
 import type { EnemyModel } from './models.ts';
 import { ELEMENT_COLOR } from './palette.ts';
@@ -92,6 +93,7 @@ export function createGlbEnemyModel(type: EnemyType, element: Element): EnemyMod
     if (mesh.isMesh) for (const m of [mesh.material].flat()) if (m instanceof THREE.MeshToonMaterial) mats.push(m);
   });
   const originalMaps = mats.map((m) => m.map);
+  const gallop = cfg.legs ? gallopLegs(mats, cfg.legs) : null;
 
   // Element glow ring at the feet (the badge shows it too).
   const ring = new THREE.Mesh(
@@ -140,6 +142,7 @@ export function createGlbEnemyModel(type: EnemyType, element: Element): EnemyMod
       }
       // Static model: the motion is done in code.
       const phase = t * (type === 'bird' || type === 'boss' ? 7 : 9) + enemy.id;
+      gallop?.update(dt, moving);
       body.position.set(0, 0, 0);
       body.rotation.set(0, 0, 0);
       if (enemy.stunT > 0) return; // frozen (enemyView tilts it)
@@ -173,6 +176,52 @@ export function createGlbEnemyModel(type: EnemyType, element: Element): EnemyMod
       ringMat.dispose();
       // Geometry and textures are shared with the cached original, so only our material copies go.
       mats.forEach((m) => m.dispose());
+    },
+  };
+}
+
+/** Horses: swing the four legs at the hips in a gallop. The model has no skeleton, so the vertex
+ *  shader rotates every vertex below the hip around its leg's hip point (front pair and back pair
+ *  half a stride apart, left legs a little behind the right ones). Body, rider and lance stay put. */
+function gallopLegs(mats: THREE.Material[], legs: NonNullable<GlbModelConfig['legs']>) {
+  const uniforms = {
+    uStride: { value: Math.random() * Math.PI * 2 },
+    uSwing: { value: 0 },
+    uLegs: { value: new THREE.Vector4(legs.hip, legs.frontZ, legs.backZ, legs.legR) },
+    uLegX: { value: legs.legX },
+  };
+  for (const m of mats) {
+    m.onBeforeCompile = (shader) => {
+      Object.assign(shader.uniforms, uniforms);
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', `#include <common>
+          uniform float uStride, uSwing, uLegX;
+          uniform vec4 uLegs; // hip y, front z, back z, leg radius`)
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
+          {
+            float hip = uLegs.x;
+            bool front = transformed.z > (uLegs.y + uLegs.z) * 0.5;
+            float zc = front ? uLegs.y : uLegs.z;
+            // 1 on the leg (below the hip, near its z, not too far sideways), 0 on the body.
+            float w = (1.0 - smoothstep(hip - 0.07, hip, transformed.y))
+                    * (1.0 - smoothstep(uLegs.w, uLegs.w * 1.7, abs(transformed.z - zc)))
+                    * (1.0 - smoothstep(uLegX, uLegX + 0.03, abs(transformed.x)));
+            float phase = uStride + (front ? 0.0 : 3.14159) + (transformed.x > 0.0 ? 0.0 : 0.7);
+            float a = uSwing * sin(phase) * w;
+            vec2 d = vec2(transformed.y - hip, transformed.z - zc);
+            float c = cos(a), s = sin(a);
+            transformed.y = hip + d.x * c - d.y * s;
+            transformed.z = zc + d.x * s + d.y * c;
+          }`);
+    };
+    m.customProgramCacheKey = () => 'gallop-legs';
+  }
+  return {
+    /** Advance the stride; the legs ease to a stop when the horse stands still. */
+    update(dt: number, moving: boolean) {
+      uniforms.uStride.value += dt * legs.strides * Math.PI * 2 * (moving ? 1 : 0.15);
+      const want = moving ? legs.swing : 0;
+      uniforms.uSwing.value += (want - uniforms.uSwing.value) * Math.min(1, dt * 6);
     },
   };
 }

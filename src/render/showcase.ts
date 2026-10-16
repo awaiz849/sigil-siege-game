@@ -1,7 +1,7 @@
 // Dev-only page (http://localhost:<port>/showcase.html): all four monster models side by side,
 // animating, so models can be checked without playing until the boss arrives.
 // Press 1 / 2 / 3 to switch every model to fire / water / nature; C toggles the archer's charge;
-// S toggles the turntable spin.
+// S toggles the turntable spin; V = side view (stops the spin; good for checking the horses' gallop).
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -52,6 +52,10 @@ window.addEventListener('keydown', (e) => {
   }
   if (e.key === 'c' || e.key === 'C') charging = !charging;
   if (e.key === 's' || e.key === 'S') spin = !spin;
+  if (e.key === 'v' || e.key === 'V') {
+    spin = false;
+    shown.forEach((s) => (s.model.group.rotation.y = Math.PI / 2));
+  }
 });
 
 // Same look as the game: render -> ink outlines -> output.
