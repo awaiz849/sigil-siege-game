@@ -29,8 +29,8 @@ export function createOverlay(canvas: HTMLCanvasElement) {
     canvas.height = height;
   }
 
-  /** Draw one frame. world/view are null before the game exists (e.g. loading). */
-  function draw(world: World | null, view: View | null, now: number) {
+  /** Draw one frame. world = null hides the HUD (menus). menu = screen layer drawn under the cursor. */
+  function draw(world: World | null, view: View | null, now: number, menu: ((ctx: CanvasRenderingContext2D) => void) | null = null) {
     const w = canvas.width;
     const h = canvas.height;
     ctx.clearRect(0, 0, w, h);
@@ -39,6 +39,7 @@ export function createOverlay(canvas: HTMLCanvasElement) {
       worldUi.draw(ctx, world, view, now);
       drawHud(ctx, world, now);
     }
+    menu?.(ctx);
     trail.draw(ctx, now);
     drawCursor(now);
 

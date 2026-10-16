@@ -7,7 +7,7 @@
 import { CONFIG } from '../config.ts';
 import type { World } from '../game/types.ts';
 import { FONT_TEXT, FONT_TITLE } from './fonts.ts';
-import { drawElementIcon, drawSigil, ELEMENT_CSS, GOLD, roundRect, type SigilShape } from './icons.ts';
+import { drawElementIcon, drawPalm, drawSigil, ELEMENT_CSS, GOLD, roundRect, type SigilShape } from './icons.ts';
 
 const PANEL = 'rgba(13, 11, 36, 0.72)';
 const BORDER = 'rgba(242, 193, 78, 0.55)';
@@ -186,22 +186,4 @@ function drawSpellbook(ctx: CanvasRenderingContext2D, world: World, s: number, h
       ctx.fillText(`${Math.ceil(world.lightningCooldown)}s`, rx + 16 * s, cy + 1 * s);
     }
   });
-}
-
-/** Simple open-hand icon: palm + four fingers + thumb. */
-function drawPalm(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string) {
-  const u = size / 20;
-  ctx.save();
-  ctx.fillStyle = color;
-  roundRect(ctx, x - 6 * u, y - 2 * u, 12 * u, 11 * u, 3 * u);
-  ctx.fill();
-  for (let k = 0; k < 4; k++) {
-    roundRect(ctx, x - 6 * u + k * 3.2 * u, y - 10 * u + (k === 0 || k === 3 ? 2 * u : 0), 2.6 * u, 10 * u, 1.3 * u);
-    ctx.fill();
-  }
-  ctx.translate(x - 6 * u, y + 2 * u);
-  ctx.rotate(-0.7);
-  roundRect(ctx, -1.3 * u, -7 * u, 2.6 * u, 8 * u, 1.3 * u);
-  ctx.fill();
-  ctx.restore();
 }

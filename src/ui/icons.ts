@@ -131,3 +131,21 @@ export function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w
   ctx.beginPath();
   ctx.roundRect(x, y, w, h, r);
 }
+
+/** Simple open-hand icon: palm + four fingers + thumb. */
+export function drawPalm(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string) {
+  const u = size / 20;
+  ctx.save();
+  ctx.fillStyle = color;
+  roundRect(ctx, x - 6 * u, y - 2 * u, 12 * u, 11 * u, 3 * u);
+  ctx.fill();
+  for (let k = 0; k < 4; k++) {
+    roundRect(ctx, x - 6 * u + k * 3.2 * u, y - 10 * u + (k === 0 || k === 3 ? 2 * u : 0), 2.6 * u, 10 * u, 1.3 * u);
+    ctx.fill();
+  }
+  ctx.translate(x - 6 * u, y + 2 * u);
+  ctx.rotate(-0.7);
+  roundRect(ctx, -1.3 * u, -7 * u, 2.6 * u, 8 * u, 1.3 * u);
+  ctx.fill();
+  ctx.restore();
+}

@@ -34,36 +34,7 @@ export function createDebugOverlay() {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
     ctx.fillRect(x0 - 8, y0 - 110, w + 16, h + 118);
 
-    if (hand) {
-      // Mirrored camera preview so it matches the player's movements.
-      ctx.save();
-      ctx.translate(x0 + w, y0);
-      ctx.scale(-1, 1);
-      ctx.drawImage(hand.video, 0, 0, w, h);
-      ctx.restore();
-
-      // Hand skeleton on the preview (mirrored like the video).
-      const lm = hand.debug.landmarks;
-      const px = (i: number) => x0 + (1 - lm[i].x) * w;
-      const py = (i: number) => y0 + lm[i].y * h;
-      if (lm.length === 21) {
-        ctx.strokeStyle = '#7CFC9A';
-        ctx.lineWidth = 2;
-        for (const [a, b] of BONES) {
-          ctx.beginPath();
-          ctx.moveTo(px(a), py(a));
-          ctx.lineTo(px(b), py(b));
-          ctx.stroke();
-        }
-        ctx.fillStyle = '#F2C14E';
-        for (let i = 0; i < 21; i++) ctx.fillRect(px(i) - 2, py(i) - 2, 4, 4);
-      }
-
-      // The active area that maps to the full screen.
-      const m = CONFIG.HAND_EDGE_MARGIN;
-      ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-      ctx.strokeRect(x0 + m * w, y0 + m * h, w * (1 - 2 * m), h * (1 - 2 * m));
-    }
+    if (hand) drawHandPreview(ctx, hand, x0, y0, w, h);
 
     const d = hand?.debug;
     const lines = [
@@ -86,4 +57,38 @@ export function createDebugOverlay() {
     toggle: () => (visible = !visible),
     isVisible: () => visible,
   };
+}
+
+/** Mirrored camera image with the hand skeleton and the active area (debug overlay + hand check). */
+export function drawHandPreview(ctx: CanvasRenderingContext2D, hand: HandInput, x0: number, y0: number, w: number, h: number) {
+  ctx.save();
+  ctx.translate(x0 + w, y0);
+  ctx.scale(-1, 1);
+  ctx.drawImage(hand.video, 0, 0, w, h);
+  ctx.restore();
+
+  // Hand skeleton on the preview (mirrored like the video).
+  const lm = hand.debug.landmarks;
+  if (lm.length === 21) {
+    const px = (i: number) => x0 + (1 - lm[i].x) * w;
+    const py = (i: number) => y0 + lm[i].y * h;
+    ctx.save();
+    ctx.strokeStyle = '#7CFC9A';
+    ctx.lineWidth = 2;
+    for (const [a, b] of BONES) {
+      ctx.beginPath();
+      ctx.moveTo(px(a), py(a));
+      ctx.lineTo(px(b), py(b));
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#F2C14E';
+    for (let i = 0; i < 21; i++) ctx.fillRect(px(i) - 2, py(i) - 2, 4, 4);
+    ctx.restore();
+  }
+
+  // The active area that maps to the full screen.
+  const m = CONFIG.HAND_EDGE_MARGIN;
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x0 + m * w, y0 + m * h, w * (1 - 2 * m), h * (1 - 2 * m));
 }

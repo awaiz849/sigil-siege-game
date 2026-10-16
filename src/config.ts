@@ -106,6 +106,16 @@ export const CONFIG = {
   /** Sideways nudge so two enemies lined up exactly still slide around each other. */
   PUSH_NUDGE: 0.05,
 
+  // ---- Sound ----
+  /** Master volume 0..1. */
+  VOLUME: 0.6,
+
+  // ---- Screens ----
+  /** Hand check: each pose must be held this long to pass. */
+  HAND_CHECK_HOLD_S: 0.6,
+  /** Wait after the round ends before the end screen appears. */
+  END_SCREEN_DELAY_S: 1.5,
+
   // ---- Overlay UI ----
   /** Each trail point fades out over this many ms. */
   TRAIL_FADE_MS: 600,

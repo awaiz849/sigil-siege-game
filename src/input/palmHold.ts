@@ -32,6 +32,12 @@ export function createPalmHold(onHold: () => void, seconds = CONFIG.PALM_HOLD_ST
         onHold();
       }
     },
+    /** Start over. A palm that is already open must close first (no accidental instant confirm). */
+    reset() {
+      since = null;
+      progress = 0;
+      fired = pose === 'palm';
+    },
     dispose: unsubscribe,
   };
 }
