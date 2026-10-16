@@ -103,6 +103,28 @@ export function createScene(canvas: HTMLCanvasElement) {
   }
   const orbTexture = radialTexture('rgba(255,255,255,1)', 'rgba(255,255,255,0)');
 
+  // Quick bright flash sprites at impacts (grow + fade in ~0.25 s).
+  const flashes: Array<{ s: THREE.Sprite; t: number; size: number }> = [];
+  function flash(at: THREE.Vector3, color: number, size: number) {
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: orbTexture, color, blending: THREE.AdditiveBlending, depthWrite: false }));
+    s.position.copy(at);
+    scene.add(s);
+    flashes.push({ s, t: 0, size });
+  }
+  function updateFlashes(dt: number) {
+    for (let i = flashes.length - 1; i >= 0; i--) {
+      const f = flashes[i];
+      f.t += dt / 0.25;
+      f.s.scale.setScalar(f.size * (0.4 + f.t));
+      f.s.material.opacity = Math.max(0, 1 - f.t);
+      if (f.t >= 1) {
+        scene.remove(f.s);
+        f.s.material.dispose();
+        flashes.splice(i, 1);
+      }
+    }
+  }
+
   /** Launch an orb from -> to; onArrive runs when it lands. */
   function fire(from: THREE.Vector3, to: THREE.Vector3, color: number, onArrive: () => void) {
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: orbTexture, color, blending: THREE.AdditiveBlending, depthWrite: false }));
@@ -189,6 +211,7 @@ export function createScene(canvas: HTMLCanvasElement) {
     enemies.update(world, time, dt);
     updateShots(dt);
     updateWaves(dt);
+    updateFlashes(dt);
     particles.update(dt);
 
     // Camera shake (castle hits) + a very slow idle sway so the view feels alive.
@@ -255,6 +278,28 @@ export function createScene(canvas: HTMLCanvasElement) {
     burstAt(pos: { x: number; y: number; z: number }, enemyId: number, color: number, count = 24) {
       const p = new THREE.Vector3(pos.x, pos.y + enemies.heightOf(enemyId) * 0.5, pos.z);
       particles.burst(p, color, count, 5, 2, 0.6);
+    },
+    /** Element-specific spell impact on an enemy: water splashes, fire explodes, nature bursts into leaves. */
+    impact(spell: string, pos: { x: number; y: number; z: number }, enemyId: number, strong: boolean) {
+      const h = enemies.heightOf(enemyId);
+      const p = new THREE.Vector3(pos.x, pos.y + h * 0.5, pos.z);
+      const k = strong ? 1.6 : 1;
+      if (spell === 'water') {
+        particles.burst(p, 0x3fa9ff, Math.round(30 * k), 3, 6, 0.9); // droplets thrown up, falling back
+        particles.burst(p, 0xdff4ff, Math.round(12 * k), 5, 1, 0.4); // white spray
+        flash(p, 0x6fc4ff, 3.5 * k);
+      } else if (spell === 'fire') {
+        particles.burst(p, 0xff6a1a, Math.round(40 * k), 7, 2.5, 0.7); // explosion
+        particles.burst(p, 0xffd25a, Math.round(16 * k), 3, 3, 0.5); // bright core sparks
+        flash(p, 0xffa040, 5 * k);
+      } else if (spell === 'nature') {
+        particles.burst(p, 0x6fe05a, Math.round(28 * k), 4, 1, 1.4); // leaves drifting slowly
+        particles.burst(p, 0xd8ffa8, Math.round(10 * k), 2.5, 2, 0.8);
+        flash(p, 0x9cff7a, 3.5 * k);
+      } else {
+        particles.burst(p, 0xcfe6ff, Math.round(22 * k), 6, 2, 0.5); // lightning sparks
+        flash(p, 0xe8f4ff, 4 * k);
+      }
     },
   };
 }

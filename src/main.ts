@@ -10,6 +10,7 @@ import { createCameraCorner } from './ui/cameraCorner.ts';
 import { loadFonts } from './ui/fonts.ts';
 import { createScreens, type CameraState } from './ui/screens.ts';
 import { playCast, playEvents } from './audio/sound.ts';
+import { setMusicIntensity, updateMusic } from './audio/music.ts';
 import { createMouseInput } from './input/mouseInput.ts';
 import { createHandInput, type HandInput } from './input/handInput.ts';
 import { onPalm, onStrokeEnd, onStrokeStart } from './events.ts';
@@ -133,7 +134,7 @@ function showCast(result: SpellResult, from?: { x: number; y: number }) {
   const color = result.spell ? SPELL_COLOR[result.spell] : undefined;
   if (color !== undefined) {
     for (const hit of result.hits) {
-      const burst = () => world3d.burstAt(hit.pos, hit.enemyId, color, hit.effect === 'strong' ? 40 : 20);
+      const burst = () => world3d.impact(result.spell!, hit.pos, hit.enemyId, hit.effect === 'strong');
       // Element spells fly as an orb from the sigil to the target; lightning strikes at once.
       if (from && result.spell !== 'lightning') world3d.castProjectile(hit.pos, hit.enemyId, color, burst);
       else burst();
@@ -149,7 +150,10 @@ function showCast(result: SpellResult, from?: { x: number; y: number }) {
 function handleEvents(events: GameEvent[]) {
   for (const ev of events) {
     if (ev.type === 'castleHit') world3d.shake(ev.cause === 'blast' ? 0.9 : 0.6);
+    else if (ev.type === 'waveStart') setMusicIntensity(ev.wave);
+    else if (ev.type === 'bossArrive') setMusicIntensity(4);
     else if (ev.type === 'gameOver') {
+      setMusicIntensity(0);
       saveRoundLog(formatRoundLog(world));
       const ended = world;
       setTimeout(() => screens.show('end', ended), CONFIG.END_SCREEN_DELAY_S * 1000);
@@ -183,6 +187,7 @@ function frame(now: number) {
   lastNow = now;
   hand?.update();
   screens.update(now);
+  updateMusic();
   update(world, dt);
   handleEvents(takeEvents(world));
   world3d.render(world, dt);

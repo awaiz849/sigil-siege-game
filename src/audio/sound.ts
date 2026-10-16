@@ -34,6 +34,12 @@ function audio(): AudioContext | null {
 // Unlock audio on the first gesture if the autoplay flag isn't set.
 for (const ev of ['pointerdown', 'keydown']) window.addEventListener(ev, () => audio(), { once: true });
 
+/** The shared audio context, master output and noise buffer (for music.ts). Null until audio can start. */
+export function audioOut(): { ctx: AudioContext; master: GainNode; noise: AudioBuffer } | null {
+  const a = audio();
+  return a && master && noiseBuffer ? { ctx: a, master, noise: noiseBuffer } : null;
+}
+
 /** One oscillator note: type, start/end frequency, duration, volume, delay. */
 function tone(type: OscillatorType, f0: number, f1: number, dur: number, vol = 0.3, delay = 0) {
   const a = audio();

@@ -83,6 +83,9 @@ export function createOverlay(canvas: HTMLCanvasElement) {
       ctx.fillText(message.text, w / 2, h * 0.5);
     }
 
+    // First-cast tutorial: until the first kill in wave 1, tell new players exactly what to do.
+    if (world && world.phase === 'PLAYING' && world.stats.kills === 0 && world.wave === 1) drawTutorial(world.time, now);
+
     if (recordedCount > 0) {
       ctx.font = `14px ${FONT_TITLE}`;
       ctx.textAlign = 'right';
@@ -90,6 +93,35 @@ export function createOverlay(canvas: HTMLCanvasElement) {
       ctx.fillStyle = '#ffb347';
       ctx.fillText(`${recordedCount} recorded templates loaded (Shift+R clears)`, w - 12, h - 12);
     }
+  }
+
+  function drawTutorial(time: number, now: number) {
+    const w = canvas.clientWidth;
+    const s = Math.max(0.7, Math.min(1.5, Math.min(w / 1280, canvas.clientHeight / 720)));
+    const lines = mouseDebug
+      ? ['DRAG to draw the shape shown above a monster', 'release to cast  -  right button = shield']
+      : ['PINCH thumb + index and draw the shape above a monster', 'RELEASE to cast  -  open palm = shield'];
+    const y = 112 * s;
+    const pulse = 0.85 + Math.sin(now / 250) * 0.15;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, time / 1.5) * pulse; // fade in after the wave banner
+    ctx.font = `700 ${18 * s}px ${FONT_TITLE}`;
+    const bw = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 40 * s;
+    ctx.fillStyle = 'rgba(13, 11, 36, 0.8)';
+    ctx.beginPath();
+    ctx.roundRect(w / 2 - bw / 2, y - 16 * s, bw, 58 * s, 10 * s);
+    ctx.fill();
+    ctx.strokeStyle = GOLD;
+    ctx.lineWidth = 2 * s;
+    ctx.stroke();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = GOLD;
+    ctx.fillText(lines[0], w / 2, y + 2 * s);
+    ctx.font = `${14 * s}px ${FONT_TITLE}`;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(lines[1], w / 2, y + 26 * s);
+    ctx.restore();
   }
 
   /** Gold dot while drawing, hollow ring while hovering, cyan ring for an open palm. */
