@@ -80,15 +80,26 @@ for (let k = 0; k < 6; k++) {
   cases.push(['line', humanize([{ x: -1, y: 0 }, { x: 1, y: 0 }], { tilt: between(-60, 60), noise: 0.01 })]);
 }
 
+/** U (cup) from the top-left: down, round the bottom, up the right side. depth = straight sides. */
+function cupPath(depth: number, rightToLeft = false): Point[] {
+  const pts: Point[] = [{ x: -1, y: -depth }];
+  for (let i = 0; i <= 12; i++) {
+    const a = Math.PI - (i / 12) * Math.PI;
+    pts.push({ x: Math.cos(a), y: Math.sin(a) });
+  }
+  pts.push({ x: 1, y: -depth });
+  return rightToLeft ? pts.reverse() : pts;
+}
+
 // Grand Warden (level 2): his own shapes, classified against his set only.
 const wardenCases: Array<[string, Point[]]> = [];
 for (let k = 0; k < 6; k++) {
-  wardenCases.push(['C', humanize(cArc(between(240, 290)))]); // soul flame: C
-  wardenCases.push(['C', humanize(cArc(between(180, 220)))]);
-  wardenCases.push(['C', humanize(cArc(between(230, 280), true))]); // drawn bottom-up
-  wardenCases.push(['O', humanize(circle(between(0, 360), true))]); // frost nova: circle
-  wardenCases.push(['O', humanize(circle(between(0, 360), false))]);
-  wardenCases.push(['O', humanize(circle(between(0, 360), true, 330), { noise: 0.06 })]); // small gap, shaky
+  wardenCases.push(['U', humanize(cupPath(between(0.3, 0.9)))]); // frost nova: U
+  wardenCases.push(['U', humanize(cupPath(between(0, 0.3)))]); // shallow bowl
+  wardenCases.push(['U', humanize(cupPath(between(0.5, 1.2), true))]); // right-to-left
+  wardenCases.push(['L', humanize([TOP, CORNER, FOOT])]); // soul flame: mirrored L, like the wizard's fire
+  wardenCases.push(['L', humanize([TOP, CORNER, { x: -0.5, y: 1 }])]); // short foot
+  wardenCases.push(['L', humanize([FOOT, CORNER, TOP], { noise: 0.06 })]); // drawn backwards, shaky
   wardenCases.push(['peak', humanize([{ x: -0.45, y: 1 }, { x: 0, y: -1 }, { x: 0.45, y: 1 }])]);
   wardenCases.push(['peak', humanize([{ x: -0.25, y: 1 }, { x: 0, y: -1 }, { x: 0.25, y: 1 }])]); // narrow
   wardenCases.push(['peak', humanize([{ x: 0.45, y: 1 }, { x: 0, y: -1 }, { x: -0.45, y: 1 }])]); // right-to-left

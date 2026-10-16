@@ -5,22 +5,23 @@ import { makeTemplate, type Template } from './dollar.ts';
 
 /** Every name the recognizer can return (besides null).
  *  Wizard (level 1): C, L (mirrored L), v, zigzag (W), line; a full circle O also counts as his C.
- *  Grand Warden (level 2): C, O (full circle), peak (Λ), M, line. */
-export type SigilName = 'line' | 'v' | 'zigzag' | 'C' | 'L' | 'O' | 'peak' | 'M';
-export const SIGIL_NAMES: SigilName[] = ['line', 'v', 'zigzag', 'C', 'L', 'O', 'peak', 'M'];
+ *  Grand Warden (level 2): U (cup), L (mirrored L, like the wizard's fire), peak (Λ), M, line. */
+export type SigilName = 'line' | 'v' | 'zigzag' | 'C' | 'L' | 'O' | 'U' | 'peak' | 'M';
+export const SIGIL_NAMES: SigilName[] = ['line', 'v', 'zigzag', 'C', 'L', 'O', 'U', 'peak', 'M'];
 
 /** Which hero draws which shapes. $1 ignores rotation, so each hero only matches his own set
- *  (an M is a W upside down, a Λ a V: never in the same set). The wizard's O is read as his C. */
+ *  (a U is a C turned round, an M a W upside down, a Λ a V: never in the same set).
+ *  The wizard's O is read as his C. */
 export type Hero = 'wizard' | 'warden';
 export const HERO_SHAPES: Record<Hero, SigilName[]> = {
   wizard: ['C', 'L', 'v', 'zigzag', 'O'],
-  warden: ['C', 'O', 'peak', 'M'],
+  warden: ['U', 'L', 'peak', 'M'],
 };
 
 /** Closed shapes end near where they started; open shapes do not.
  *  C and O are in both lists: a sloppy circle can leave a gap, a C can nearly close. */
 export const CLOSED_SHAPES: SigilName[] = ['C', 'O'];
-export const OPEN_SHAPES: SigilName[] = ['v', 'zigzag', 'L', 'C', 'O', 'peak', 'M'];
+export const OPEN_SHAPES: SigilName[] = ['v', 'zigzag', 'L', 'C', 'O', 'U', 'peak', 'M'];
 
 /** Circle starting at the top. sweepDeg < 360 = left a gap, > 360 = went round too far
  *  (both are common when drawing in the air). Increasing angle = clockwise on screen (y down). */
@@ -71,6 +72,17 @@ function zigzag(valleys: number, rightToLeft = false): Point[] {
   return rightToLeft ? pts.reverse() : pts;
 }
 
+/** U (cup): down the left side, round the bottom, up the right side. depth = straight sides. */
+function cup(depth: number, rightToLeft = false): Point[] {
+  const pts: Point[] = [{ x: -1, y: -depth }];
+  for (let i = 0; i <= 18; i++) {
+    const a = Math.PI - (i / 18) * Math.PI; // left -> bottom -> right (y down on screen)
+    pts.push({ x: Math.cos(a), y: Math.sin(a) });
+  }
+  pts.push({ x: 1, y: -depth });
+  return rightToLeft ? pts.reverse() : pts;
+}
+
 /** Λ (peak): up from the bottom-left to a sharp top, down to the bottom-right. */
 function peak(halfWidth: number, rightToLeft = false): Point[] {
   const pts = [{ x: -halfWidth, y: 1 }, { x: 0, y: -1 }, { x: halfWidth, y: 1 }];
@@ -108,7 +120,15 @@ export function builtInTemplates(): Template[] {
     makeTemplate('zigzag', zigzag(2, true)),
     makeTemplate('zigzag', zigzag(3)), // 3 valleys
     makeTemplate('zigzag', zigzag(3, true)),
-    // Grand Warden (level 2)
+    // Grand Warden (level 2). His fire is the same mirrored L as the wizard's (the 'L' templates above).
+    makeTemplate('U', cup(0.6)), // classic cup
+    makeTemplate('U', cup(0)), // shallow bowl
+    makeTemplate('U', cup(1.2)), // deep
+    makeTemplate('U', cup(0.6, true)), // right-to-left
+    makeTemplate('U', cup(0.3)),
+    makeTemplate('U', cup(0.3, true)),
+    makeTemplate('U', cup(0.9, true)), // deep, right-to-left (else it can pass for a 7)
+    makeTemplate('U', cup(1.2, true)),
     makeTemplate('peak', peak(0.45)),
     makeTemplate('peak', peak(0.25)), // narrow
     makeTemplate('peak', peak(0.45, true)), // right-to-left

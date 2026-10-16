@@ -215,8 +215,8 @@ const ROWS: Record<Hero, Row[]> = {
     { shape: 'palm', name: 'SHIELD', color: '#9fe6ff', cost: COST.shield, note: 'open palm' },
   ],
   warden: [
-    { shape: 'O', name: 'FROST', color: ELEMENT_CSS.water, cost: COST.frost, self: 'water', beats: 'fire' },
-    { shape: 'C', name: 'FLAME', color: ELEMENT_CSS.fire, cost: COST.flame, self: 'fire', beats: 'nature' },
+    { shape: 'U', name: 'FROST', color: ELEMENT_CSS.water, cost: COST.frost, self: 'water', beats: 'fire' },
+    { shape: 'L', name: 'FLAME', color: ELEMENT_CSS.fire, cost: COST.flame, self: 'fire', beats: 'nature' },
     { shape: 'peak', name: 'THORN', color: ELEMENT_CSS.nature, cost: COST.thorn, self: 'nature', beats: 'water' },
     { shape: 'M', name: 'ARCANE', color: '#c9a0ff', cost: COST.arcane, note: 'all + slow', cooldown: 'all' },
     { shape: 'line', name: 'TIME WARP', color: '#b8a0ff', cost: COST.timewarp, note: 'slow all', cooldown: 'push' },

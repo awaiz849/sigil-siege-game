@@ -529,7 +529,7 @@ export function createScreens(opts: Opts) {
     // The chosen hero's four sigils, glowing in turn, under the level buttons.
     const sig = hero === 'wizard'
       ? [{ shape: 'C' as const, color: ELEMENT_CSS.water }, { shape: 'L' as const, color: ELEMENT_CSS.fire }, { shape: 'v' as const, color: ELEMENT_CSS.nature }, { shape: 'zigzag' as const, color: '#cfe6ff' }]
-      : [{ shape: 'O' as const, color: ELEMENT_CSS.water }, { shape: 'C' as const, color: ELEMENT_CSS.fire }, { shape: 'peak' as const, color: ELEMENT_CSS.nature }, { shape: 'M' as const, color: '#c9a0ff' }];
+      : [{ shape: 'U' as const, color: ELEMENT_CSS.water }, { shape: 'L' as const, color: ELEMENT_CSS.fire }, { shape: 'peak' as const, color: ELEMENT_CSS.nature }, { shape: 'M' as const, color: '#c9a0ff' }];
     sig.forEach((g, i) => {
       const x = W / 2 + (i - 1.5) * 60 * s;
       ctx.globalAlpha = 0.55 + 0.45 * Math.sin(now / 500 - i * 0.8);
