@@ -57,6 +57,40 @@ export const CONFIG = {
     hard: { speed: 1.25, spawnInterval: 0.8, maxEnemies: 9 },
   } as Record<Difficulty, { speed: number; spawnInterval: number; maxEnemies: number }>,
 
+  // ---- Game logic: field, spawning, crowd (src/game) ----
+  /** Longest frame step the logic accepts (s); a bigger gap (tab switch) is clamped. */
+  MAX_DT: 0.1,
+  /** Field in three.js world units: enemies spawn at spawnZ and walk +z toward wallZ.
+   *  lanes = spawn x positions, halfWidth = how far sideways enemies may be pushed,
+   *  laneClearDist = a lane is free when nobody is this close to its spawn point. */
+  FIELD: { spawnZ: -30, wallZ: -4, lanes: [-6, -3, 0, 3, 6], halfWidth: 8, laneClearDist: 3 },
+  /** Distance from the wall where the red danger ring shows (renderer reads this). */
+  DANGER_DIST: 5,
+  /** Collision radius per enemy type (push-apart). */
+  ENEMY_RADIUS: { imp: 0.8, bird: 0.6, warlock: 0.8, boss: 1.6 },
+  /** Birds fly at flyY and dive down to diveY over the last diveDist units before the wall. */
+  BIRD_FLIGHT: { flyY: 4, diveY: 1.2, diveDist: 8 },
+  /** Warlocks stop at this fraction of the way from spawn to the wall. */
+  WARLOCK_STOP_FRACTION: 0.5,
+  /** Spawn intervals in seconds per wave (Normal; multiplied by difficulty). 0 = none. */
+  WAVES: [
+    { imp: 3.5, bird: 0, warlock: 0 },
+    { imp: 3.6, bird: 8, warlock: 0 },
+    { imp: 3.6, bird: 8, warlock: 15 },
+  ],
+  /** After the boss arrives imps come every this many seconds. */
+  AFTER_BOSS_IMP_S: 5,
+  /** Delay before the first spawn of a newly enabled enemy type in a wave. */
+  FIRST_SPAWN_DELAY_S: 1,
+  /** All spawns pause this long when the boss arrives. */
+  BOSS_SPAWN_PAUSE_S: 6,
+  /** Two spawns never happen closer together than this (no bursts). */
+  SPAWN_MIN_GAP_S: 0.8,
+  /** Wave 1: this many imps in a row share one element before it changes. */
+  WAVE1_SAME_ELEMENT: 3,
+  /** Sideways nudge so two enemies lined up exactly still slide around each other. */
+  PUSH_NUDGE: 0.05,
+
   // ---- Rendering ----
   /** Cap on devicePixelRatio; lower it if 3D stutters with tracking. */
   MAX_PIXEL_RATIO: 1.5,
