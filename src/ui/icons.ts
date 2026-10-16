@@ -77,7 +77,7 @@ export function drawElementIcon(ctx: CanvasRenderingContext2D, element: Element,
   ctx.restore();
 }
 
-export type SigilShape = 'circle' | 'L' | 'v' | 'zigzag' | 'line';
+export type SigilShape = 'C' | 'L' | 'v' | 'zigzag' | 'line';
 
 /** Sigil outline centred on (x, y) inside a `size` box. Lightning is always a W, never a Z. */
 export function drawSigil(ctx: CanvasRenderingContext2D, shape: SigilShape, x: number, y: number, size: number, color: string, lineWidth = 3) {
@@ -89,8 +89,9 @@ export function drawSigil(ctx: CanvasRenderingContext2D, shape: SigilShape, x: n
   ctx.lineJoin = 'round';
   ctx.beginPath();
   switch (shape) {
-    case 'circle':
-      ctx.arc(x, y, h * 0.85, 0, Math.PI * 2);
+    case 'C':
+      // Half circle opening to the right (like the letter C).
+      ctx.arc(x + h * 0.15, y, h * 0.8, -Math.PI * 0.3, Math.PI * 0.3, true);
       break;
     case 'L':
       ctx.moveTo(x - h * 0.5, y - h * 0.9);
@@ -120,7 +121,7 @@ export function drawSigil(ctx: CanvasRenderingContext2D, shape: SigilShape, x: n
 
 /** The sigil that beats each element (for the wave-1 hints above enemies). */
 export const COUNTER_SIGIL: Record<Element, SigilShape> = {
-  fire: 'circle', // water beats fire
+  fire: 'C', // water beats fire
   nature: 'L', // fire beats nature
   water: 'v', // nature beats water
 };

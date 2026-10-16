@@ -40,9 +40,9 @@ function runEnemies(world: World, seconds: number): void {
 // ---- Element damage: base 1, x2 strong, x0.5 same element, x1 otherwise ----
 {
   const cases: Array<[string, 'fire' | 'water' | 'nature', number]> = [
-    ['circle', 'fire', 2], // water beats fire
-    ['circle', 'water', 0.5], // same element
-    ['circle', 'nature', 1],
+    ['C', 'fire', 2], // water beats fire
+    ['C', 'water', 0.5], // same element
+    ['C', 'nature', 1],
     ['L', 'nature', 2], // fire beats nature
     ['L', 'fire', 0.5],
     ['v', 'water', 2], // nature beats water
@@ -57,7 +57,7 @@ function runEnemies(world: World, seconds: number): void {
   }
   const w = fresh();
   const imp = spawnEnemy(w, 'imp', 'fire', 0);
-  check('strong hit reports effect', cast(w, 'circle', imp).hits[0].effect === 'strong');
+  check('strong hit reports effect', cast(w, 'C', imp).hits[0].effect === 'strong');
 }
 
 // ---- Stunned enemies take x2 more (stacks with element) ----
@@ -65,7 +65,7 @@ function runEnemies(world: World, seconds: number): void {
   const w = fresh();
   const boss = spawnEnemy(w, 'boss', 'fire', 0);
   boss.stunT = 2;
-  const r = cast(w, 'circle', boss);
+  const r = cast(w, 'C', boss);
   check('strong x stunned = 4', near(r.hits[0].damage, 4) && r.hits[0].stunned);
 }
 
@@ -88,12 +88,12 @@ function runEnemies(world: World, seconds: number): void {
 {
   const w = fresh();
   w.combo = 4;
-  check('no enemies = miss', cast(w, 'circle', null).kind === 'miss' && w.combo === 1);
+  check('no enemies = miss', cast(w, 'C', null).kind === 'miss' && w.combo === 1);
   const imp = spawnEnemy(w, 'imp', 'water', 0);
   w.combo = 4;
-  check('enemy off screen = miss', castSpell(w, 'circle', { x: 0, y: 0 }, () => null).kind === 'miss' && w.combo === 1);
+  check('enemy off screen = miss', castSpell(w, 'C', { x: 0, y: 0 }, () => null).kind === 'miss' && w.combo === 1);
   w.combo = 4;
-  check('dead/unknown id = miss', castSpellOn(w, 'circle', 999).kind === 'miss' && w.combo === 1);
+  check('dead/unknown id = miss', castSpellOn(w, 'C', 999).kind === 'miss' && w.combo === 1);
   w.combo = 4;
   check('null sigil = fizzle', cast(w, null, null).kind === 'fizzle' && w.combo === 1);
   w.combo = 4;
@@ -110,7 +110,7 @@ function runEnemies(world: World, seconds: number): void {
   check('same element = 0.5', effectiveness('fire', 'fire') === 0.5);
   check('losing element = 1', effectiveness('fire', 'water') === 1);
   // Hints: the shape that beats each element.
-  check('fire enemy -> circle', counterShape('fire') === 'circle');
+  check('fire enemy -> C', counterShape('fire') === 'C');
   check('nature enemy -> L', counterShape('nature') === 'L');
   check('water enemy -> v', counterShape('water') === 'v');
 }
@@ -119,12 +119,12 @@ function runEnemies(world: World, seconds: number): void {
 {
   const w = fresh();
   const imp = spawnEnemy(w, 'imp', 'fire', 0);
-  const r = cast(w, 'circle', imp); // water on fire: 2 damage kills the 2-HP imp
+  const r = cast(w, 'C', imp); // water on fire: 2 damage kills the 2-HP imp
   const texts = r.texts.map((t) => t.text);
   check('super effective text', texts.includes(TEXT.superEffective), texts.join(','));
   check('kill score text', texts.includes('+100'), texts.join(','));
   check('texts placed over the enemy', r.texts.every((t) => t.pos !== null && t.pos.x === 0));
-  cast(w, 'circle', null);
+  cast(w, 'C', null);
   cast(w, null, null);
   const events = takeEvents(w).filter((e) => e.type === 'floatText');
   check('float text events', events.map((e) => e.text).join(',') === `${TEXT.superEffective},+100,${TEXT.miss},${TEXT.fizzle}`, events.map((e) => e.text).join(','));
@@ -141,7 +141,7 @@ function runEnemies(world: World, seconds: number): void {
   check('new world waits in MENU', w.phase === 'MENU');
   update(w, 0.05);
   check('nothing moves in MENU', w.time === 0 && w.enemies.length === 0);
-  check('no casting in MENU', cast(w, 'circle', null).kind === 'ignored' && castShield(w).kind === 'ignored');
+  check('no casting in MENU', cast(w, 'C', null).kind === 'ignored' && castShield(w).kind === 'ignored');
   startRound(w);
   update(w, 0.05);
   check('startRound -> PLAYING', w.phase === 'PLAYING' && w.time > 0);
@@ -281,7 +281,7 @@ function runEnemies(world: World, seconds: number): void {
   cast(w, 'v', boss);
   update(w, 0.01);
   check('killing the boss wins', w.phase === 'WIN' && w.events.some((e) => e.type === 'gameOver'));
-  check('cast after game over ignored', cast(w, 'circle', null).kind === 'ignored');
+  check('cast after game over ignored', cast(w, 'C', null).kind === 'ignored');
 
   const lose = fresh();
   lose.castleHp = 5;
@@ -359,10 +359,10 @@ function runEnemies(world: World, seconds: number): void {
   noteStrokeStart(w);
   for (let i = 0; i < 30; i++) update(w, 0.05); // drawing for 1.5 s
   const target = w.enemies[0];
-  cast(w, 'circle', target);
+  cast(w, 'C', target);
   const stroke = w.log.strokes[0];
   check('stroke logged', w.log.strokes.length === 1 && Math.abs(stroke.seconds - 1.5) < 1e-6, JSON.stringify(stroke));
-  cast(w, 'circle', target);
+  cast(w, 'C', target);
   check('cast without pen-down not logged', w.log.strokes.length === 1);
   check('enemies sampled each second', w.log.enemiesPerSecond.length === 4, String(w.log.enemiesPerSecond));
   const kills = w.stats.kills;

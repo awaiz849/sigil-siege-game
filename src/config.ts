@@ -141,7 +141,12 @@ export const CONFIG = {
   OVERLAY_MAX_PIXEL_RATIO: 2,
   SHADOWS: false,
   /** Glow on emissive things. Turn off first if FPS drops (after shadows). */
-  BLOOM: { enabled: true, strength: 0.9, radius: 0.55, threshold: 0.8 },
+  BLOOM: { enabled: true, strength: 0.9, radius: 0.55, threshold: 0.8, resolutionScale: 0.5 },
+  /** Automatic quality: if FPS stays under minFps for `seconds`, step down
+   *  (1 = bloom off, 2 = pixel ratio 1, 3 = pixel ratio 0.75). The D overlay shows the level. */
+  AUTO_QUALITY: { enabled: true, minFps: 45, seconds: 2.5 },
+  /** Soft mist sprites over the field (big transparent sprites cost fill rate). */
+  MIST_SPRITES: 8,
   /** Night look: sky fill light, moonlight, fog density. Raise ambient/moon if the demo screen is too dark. */
   NIGHT: { ambient: 1.1, moon: 2.2, fog: 0.017 },
   /** Castle towers: sideways distance from the centre and how far they stick out from the wall

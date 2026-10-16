@@ -151,9 +151,15 @@ function createRift(): Piece {
   glow.scale.set(14, 14, 1);
   glow.position.z = -0.5;
   g.add(glow);
-  const light = new THREE.PointLight(0xff2a50, 18, 30, 1.6);
-  light.position.set(0, -2, 3);
-  g.add(light);
+  // Red glow pooled on the road in front of it (a flat additive decal: far cheaper than a light).
+  const pool = new THREE.Mesh(
+    new THREE.CircleGeometry(7, 32),
+    new THREE.MeshBasicMaterial({ map: radialTexture('rgba(255,40,80,0.55)', 'rgba(255,40,80,0)'), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }),
+  );
+  pool.rotation.x = -Math.PI / 2;
+  pool.position.set(0, -(4.2 * CONFIG.LANDMARKS.riftScale + 0.6) / CONFIG.LANDMARKS.riftScale + 0.05, 4);
+  g.add(pool);
+  const poolMat = pool.material as THREE.MeshBasicMaterial;
 
   return {
     object: g,
@@ -162,7 +168,7 @@ function createRift(): Piece {
       core.rotation.z = t * 0.3;
       const pulse = 0.85 + Math.sin(t * 2.3) * 0.15;
       ringMat.emissiveIntensity = 3 * pulse;
-      light.intensity = 18 * pulse;
+      poolMat.opacity = pulse;
       glow.scale.setScalar(13 + Math.sin(t * 1.7) * 1.2);
     },
   };

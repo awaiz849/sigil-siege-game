@@ -98,8 +98,35 @@ export function createScene(canvas: HTMLCanvasElement) {
     height = h;
     renderer.setSize(w, h, false);
     composer.setSize(w, h);
+    // Bloom is soft anyway: compute it at lower resolution (much cheaper).
+    const pr = renderer.getPixelRatio();
+    bloom.setSize(w * pr * CONFIG.BLOOM.resolutionScale, h * pr * CONFIG.BLOOM.resolutionScale);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+  }
+
+  // ---- Automatic quality: step down when the frame rate stays low.
+  let quality = 0; // 0 = full, 1 = no bloom, 2 = pixel ratio 1, 3 = pixel ratio 0.75
+  let fps = 60;
+  let slowFor = 0;
+  let warmup = 3; // ignore the first seconds (loading, shader compiles)
+  function autoQuality(dt: number) {
+    if (!CONFIG.AUTO_QUALITY.enabled || dt <= 0) return;
+    fps += (1 / dt - fps) * 0.05;
+    if (warmup > 0) {
+      warmup -= dt;
+      return;
+    }
+    slowFor = fps < CONFIG.AUTO_QUALITY.minFps ? slowFor + dt : 0;
+    if (slowFor < CONFIG.AUTO_QUALITY.seconds || quality >= 3) return;
+    quality++;
+    slowFor = 0;
+    warmup = 1.5; // let the new setting settle before judging again
+    if (quality >= 2) {
+      renderer.setPixelRatio(quality === 2 ? 1 : 0.75);
+      resize(width, height);
+    }
+    console.info(`Auto quality: level ${quality} (${['full', 'bloom off', 'pixel ratio 1', 'pixel ratio 0.75'][quality]})`);
   }
 
   /** Draw one frame. dt in seconds. */
@@ -130,7 +157,8 @@ export function createScene(canvas: HTMLCanvasElement) {
     );
     camera.lookAt(lookAt);
 
-    if (CONFIG.BLOOM.enabled) composer.render(dt);
+    autoQuality(dt);
+    if (CONFIG.BLOOM.enabled && quality < 1) composer.render(dt);
     else renderer.render(scene, camera);
   }
 
@@ -175,6 +203,10 @@ export function createScene(canvas: HTMLCanvasElement) {
     /** Light up the whole scene (lightning). */
     lightningFlash() {
       lightningT = 1;
+    },
+    /** Current auto-quality level (0 = full). */
+    get quality() {
+      return quality;
     },
     /** Kick the camera (0..1). */
     shake(amount: number) {

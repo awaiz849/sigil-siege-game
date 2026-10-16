@@ -125,7 +125,7 @@ function drawScore(ctx: CanvasRenderingContext2D, world: World, s: number, w: nu
 type Row = { shape: SigilShape | 'palm'; name: string; color: string; beats?: keyof typeof ELEMENT_CSS; self?: keyof typeof ELEMENT_CSS };
 
 const ROWS: Row[] = [
-  { shape: 'circle', name: 'WATER', color: ELEMENT_CSS.water, self: 'water', beats: 'fire' },
+  { shape: 'C', name: 'WATER', color: ELEMENT_CSS.water, self: 'water', beats: 'fire' },
   { shape: 'L', name: 'FIRE', color: ELEMENT_CSS.fire, self: 'fire', beats: 'nature' },
   { shape: 'v', name: 'NATURE', color: ELEMENT_CSS.nature, self: 'nature', beats: 'water' },
   { shape: 'zigzag', name: 'LIGHTNING', color: '#cfe6ff' },

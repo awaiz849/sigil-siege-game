@@ -5,6 +5,7 @@ import { CONFIG, type Difficulty } from './config.ts';
 import { createScene } from './render/scene.ts';
 import { createOverlay } from './ui/overlay.ts';
 import { createDebugOverlay } from './ui/debugOverlay.ts';
+import { createCameraCorner } from './ui/cameraCorner.ts';
 import { loadFonts } from './ui/fonts.ts';
 import { createScreens, type CameraState } from './ui/screens.ts';
 import { playCast, playEvents } from './audio/sound.ts';
@@ -28,6 +29,7 @@ document.body.append(glCanvas, vignette, overlayCanvas);
 const world3d = createScene(glCanvas);
 const overlay = createOverlay(overlayCanvas);
 const debugOverlay = createDebugOverlay();
+const cameraCorner = createCameraCorner();
 loadFonts().catch((err) => console.warn('Fonts failed to load', err));
 
 // ---- Game ----
@@ -184,7 +186,9 @@ function frame(now: number) {
   // HUD only during a round; menus draw over the live 3D scene.
   overlay.draw(world.phase === 'MENU' || screens.current ? null : world, view, now, screens.current ? (ctx) => screens.draw(ctx, now) : null);
   debugOverlay.tick(now);
-  debugOverlay.draw(overlay.ctx, hand);
+  // Live camera in the corner during play (the debug overlay has its own bigger one).
+  if (hand && !screens.current && !debugOverlay.isVisible()) cameraCorner.draw(overlay.ctx, hand);
+  debugOverlay.draw(overlay.ctx, hand, world3d.quality);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

@@ -396,9 +396,8 @@ function createTorch(x: number, y: number, z: number) {
     new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.6, roughness: 0.5 }),
   );
   bowl.position.y = 0.3;
-  const light = new THREE.PointLight(PALETTE.torch, 2.2, 7, 2);
-  light.position.set(0, 0.8, -1.2); // a little in front, so it lights the road more than the merlons
-  g.add(pole, bowl, light);
+  // No real light here (point lights are expensive on laptop GPUs): the flame sprites + bloom sell it.
+  g.add(pole, bowl);
 
   // Flame: a few additive sprites that bob and flicker (bloom makes them glow).
   const flameTex = radialTexture('rgba(255,220,140,1)', 'rgba(255,90,20,0)');
@@ -414,7 +413,6 @@ function createTorch(x: number, y: number, z: number) {
     group: g,
     update(t: number) {
       const flicker = 0.85 + Math.sin(t * 17) * 0.06 + Math.sin(t * 7.3) * 0.08;
-      light.intensity = 2.2 * flicker;
       flames.forEach((f, k) => {
         const phase = t * (5 + k) + k * 2;
         f.position.set(Math.sin(phase) * 0.04, 0.55 + k * 0.16 + Math.sin(phase * 1.3) * 0.03, 0);
@@ -432,7 +430,7 @@ function createMist() {
   const tex = radialTexture('rgba(190,180,255,0.55)', 'rgba(190,180,255,0)');
   const sprites: THREE.Sprite[] = [];
   const base: Array<{ x: number; z: number; speed: number; phase: number }> = [];
-  for (let i = 0; i < 18; i++) {
+  for (let i = 0; i < CONFIG.MIST_SPRITES; i++) {
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.16, depthWrite: false }));
     const z = range(-75, -9);
     s.scale.set(range(18, 30), range(4, 7), 1);

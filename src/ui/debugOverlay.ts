@@ -23,7 +23,7 @@ export function createDebugOverlay() {
     lastFrame = now;
   }
 
-  function draw(ctx: CanvasRenderingContext2D, hand: HandInput | null) {
+  function draw(ctx: CanvasRenderingContext2D, hand: HandInput | null, quality = 0) {
     if (!visible) return;
     const w = 320;
     const h = 240;
@@ -39,7 +39,7 @@ export function createDebugOverlay() {
     const d = hand?.debug;
     const lines = [
       `render ${renderFps.toFixed(0)} fps   tracking ${d ? d.trackingFps.toFixed(0) : '-'} fps (${d ? d.detectMs.toFixed(1) : '-'} ms)`,
-      `mode ${CONFIG.INPUT_MODE}   hand ${d?.handVisible ? 'yes' : 'no'}`,
+      `mode ${CONFIG.INPUT_MODE}   hand ${d?.handVisible ? 'yes' : 'no'}   quality ${['full', 'no bloom', 'res 1x', 'res 0.75x'][quality]}`,
       `pose raw ${d?.rawPose ?? '-'}   stable ${d?.stablePose ?? '-'}`,
       `pinch ${d ? d.pinch.toFixed(2) : '-'}  (on < ${CONFIG.PINCH_ON}, off > ${CONFIG.PINCH_OFF})`,
     ];

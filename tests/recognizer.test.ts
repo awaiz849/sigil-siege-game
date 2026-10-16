@@ -49,17 +49,23 @@ function circle(startDeg: number, clockwise: boolean, sweepDeg = 360): Point[] {
   return pts;
 }
 
+/** C opening to the right: start near the top-right, go round the left side. */
+function cArc(sweepDeg: number, reverse = false): Point[] {
+  const pts = circle(-90 + (360 - sweepDeg) / 2, false, sweepDeg);
+  return reverse ? pts.reverse() : pts;
+}
+
 /** L corners: top of the upright, the corner, end of the foot. */
 const TOP = { x: 0, y: -1 }, CORNER = { x: 0, y: 1 }, FOOT = { x: 1.2, y: 1 };
 
 const cases: Array<[string, Point[]]> = [];
 for (let k = 0; k < 6; k++) {
-  cases.push(['circle', humanize(circle(between(0, 360), true))]);
-  cases.push(['circle', humanize(circle(between(0, 360), false))]);
-  cases.push(['circle', humanize(circle(-90, true, 320))]); // left a gap
-  cases.push(['circle', humanize(circle(between(0, 360), false, 265))]); // big gap
-  cases.push(['circle', humanize(circle(between(0, 360), true, 460))]); // went round too far
-  cases.push(['circle', humanize(circle(between(0, 360), true, 330), { noise: 0.1 })]); // shaky + gap
+  cases.push(['C', humanize(cArc(between(240, 290)))]); // classic C
+  cases.push(['C', humanize(cArc(between(180, 220)))]); // half circle
+  cases.push(['C', humanize(cArc(between(230, 280), true))]); // drawn bottom-up
+  cases.push(['C', humanize(cArc(between(200, 260)), { noise: 0.08 })]); // shaky
+  cases.push(['C', humanize(circle(between(0, 360), true))]); // full circle still = water
+  cases.push(['C', humanize(circle(between(0, 360), false, 320))]); // nearly full circle
   cases.push(['L', humanize([TOP, CORNER, FOOT])]);
   cases.push(['L', humanize([TOP, CORNER, { x: 0.5, y: 1 }])]); // short foot
   cases.push(['L', humanize([TOP, CORNER, { x: 2, y: 1 }])]); // long foot

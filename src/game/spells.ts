@@ -8,7 +8,7 @@ import { logCast } from './roundLog.ts';
 
 /** Which spell each recognizer shape casts. The shield is the open palm, not a shape. */
 export const SIGIL_SPELLS: Record<string, SpellName> = {
-  circle: 'water',
+  C: 'water',
   L: 'fire',
   v: 'nature',
   zigzag: 'lightning',
@@ -94,7 +94,7 @@ export function pickTarget(world: World, strokeCentre: ScreenPoint, project: Pro
 
 /**
  * Cast the spell for a drawn shape.
- * @param shape        recognizer name (line | v | zigzag | circle | L), or null if not recognized
+ * @param shape        recognizer name (line | v | zigzag | C | L), or null if not recognized
  * @param strokeCentre centre of the stroke in overlay pixels: picks the target
  * @param project      renderer's enemy -> screen position function
  */
