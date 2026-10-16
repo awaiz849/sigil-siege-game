@@ -18,6 +18,7 @@ type View = {
   flashMats: Array<{ mat: THREE.MeshStandardMaterial; base: THREE.Color; baseIntensity: number }>;
   hp: number;
   hitT: number; // 1 right after a hit, fades to 0
+  stepT: number; // time to the next footstep dust puff
   last: Enemy; // last seen state (used for the death effect after removal)
   spawnT: number;
 };
@@ -59,7 +60,7 @@ export function createEnemyView(scene: THREE.Scene, particles: Particles) {
       if (m instanceof THREE.MeshStandardMaterial && m.emissiveIntensity < 1) flashMats.add(m);
     });
     const flash = [...flashMats].map((mat) => ({ mat, base: mat.emissive.clone(), baseIntensity: mat.emissiveIntensity }));
-    views.set(enemy.id, { model, shadow, stunStars, element: enemy.element, flashMats: flash, hp: enemy.hp, hitT: 0, last: { ...enemy, pos: { ...enemy.pos } }, spawnT: t });
+    views.set(enemy.id, { model, shadow, stunStars, element: enemy.element, flashMats: flash, hp: enemy.hp, hitT: 0, stepT: 0, last: { ...enemy, pos: { ...enemy.pos } }, spawnT: t });
     // Puff of dust where it appears.
     particles.burst(new THREE.Vector3(enemy.pos.x, 0.4, enemy.pos.z), 0x8a7a9a, 12, 2.5, 1, 0.6);
   }
@@ -128,6 +129,16 @@ export function createEnemyView(scene: THREE.Scene, particles: Particles) {
         }
         g.position.z -= view.hitT * 0.35;
         g.rotation.x = -view.hitT * 0.25;
+
+        // Footstep dust for walking golems (bigger, slower stomps for the boss).
+        if ((enemy.type === 'imp' || enemy.type === 'boss') && enemy.state === 'walk' && enemy.stunT <= 0) {
+          view.stepT -= dt;
+          if (view.stepT <= 0) {
+            const boss = enemy.type === 'boss';
+            view.stepT = boss ? 0.55 : 0.33;
+            particles.burst(new THREE.Vector3(enemy.pos.x, 0.15, enemy.pos.z), 0x7a6a80, boss ? 14 : 4, boss ? 2.5 : 1.2, 0.4, 0.5);
+          }
+        }
 
         view.model.animate(enemy, t, dt);
       }

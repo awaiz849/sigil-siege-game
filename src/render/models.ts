@@ -110,6 +110,53 @@ function golem(element: Element, scale: number, isBoss: boolean): EnemyModel {
     body.add(s);
   }
 
+  // Monster details: curved horns, an angry brow, fangs, glowing cracks, crystal spikes on the back.
+  const horn = new THREE.MeshStandardMaterial({ color: 0x2a2228, flatShading: true, roughness: 0.6 });
+  for (const side of [-1, 1]) {
+    const h1 = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.42, 6), horn);
+    h1.position.set(side * 0.3, 2.78, 0.1);
+    h1.rotation.z = -side * 0.7;
+    const h2 = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.3, 6), horn);
+    h2.position.set(side * 0.47, 2.98, 0.1);
+    h2.rotation.z = -side * 0.1;
+    body.add(h1, h2);
+    // Brow slants down toward the middle: angry.
+    const brow = box(0.26, 0.07, 0.08, dark);
+    brow.position.set(side * 0.16, 2.53, 0.46);
+    brow.rotation.z = side * 0.35;
+    body.add(brow);
+    const fang = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.12, 4), new THREE.MeshStandardMaterial({ color: 0xeee8d8 }));
+    fang.rotation.x = Math.PI;
+    fang.position.set(side * 0.12, 2.22, 0.46);
+    body.add(fang);
+  }
+  const mouth = box(0.36, 0.06, 0.04, new THREE.MeshBasicMaterial({ color: 0x120608 }));
+  mouth.position.set(0, 2.26, 0.45);
+  body.add(mouth);
+  // Cracks of element light running across the chest.
+  for (const [cx, cy, rot, len] of [
+    [-0.3, 1.8, 0.7, 0.4],
+    [0.32, 1.35, -0.5, 0.35],
+    [0.15, 1.95, 0.2, 0.25],
+  ] as const) {
+    const crack = box(len, 0.035, 0.03, mats.glow);
+    crack.position.set(cx, cy, 0.47);
+    crack.rotation.z = rot;
+    body.add(crack);
+  }
+  // Glowing crystal spikes along the back (back = -z, the side facing away from the wall).
+  for (const [sx, sy, sz, s] of [
+    [0, 2.15, -0.5, 1],
+    [-0.35, 1.8, -0.48, 0.75],
+    [0.35, 1.75, -0.48, 0.7],
+    [0, 1.4, -0.48, 0.6],
+  ] as const) {
+    const spike = new THREE.Mesh(new THREE.ConeGeometry(0.12 * s, 0.55 * s, 5), mats.glow);
+    spike.position.set(sx, sy, sz);
+    spike.rotation.x = -1.1;
+    body.add(spike);
+  }
+
   // Long arms (golems drag their knuckles) and short legs.
   const armL = limb(0.38, 1.25, 0.4, mats.stone);
   const armR = limb(0.38, 1.25, 0.4, mats.stone);
