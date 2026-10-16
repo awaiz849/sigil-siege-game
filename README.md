@@ -22,7 +22,7 @@ No keyboard, mouse or touch is needed at any point, including the menus, startin
 | Sigil | Spell | Effect |
 |---|---|---|
 | C (half circle; a full circle works too) | Water | Hits one enemy, beats Fire |
-| L | Fire | Hits one enemy, beats Nature |
+| ⅃ (mirrored L: down, then left) | Fire | Hits one enemy, beats Nature |
 | V | Nature | Hits one enemy, beats Water |
 | W zigzag | Lightning | 1 damage to every enemy, 10 s cooldown |
 | — straight line | Wind | Pushes every walking enemy back, 12 s cooldown |

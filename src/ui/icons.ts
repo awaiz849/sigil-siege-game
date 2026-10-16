@@ -94,9 +94,10 @@ export function drawSigil(ctx: CanvasRenderingContext2D, shape: SigilShape, x: n
       ctx.arc(x + h * 0.15, y, h * 0.8, -Math.PI * 0.3, Math.PI * 0.3, true);
       break;
     case 'L':
-      ctx.moveTo(x - h * 0.5, y - h * 0.9);
-      ctx.lineTo(x - h * 0.5, y + h * 0.8);
-      ctx.lineTo(x + h * 0.7, y + h * 0.8);
+      // Mirrored L (⅃): down, then left.
+      ctx.moveTo(x + h * 0.5, y - h * 0.9);
+      ctx.lineTo(x + h * 0.5, y + h * 0.8);
+      ctx.lineTo(x - h * 0.7, y + h * 0.8);
       break;
     case 'v':
       ctx.moveTo(x - h * 0.7, y - h * 0.8);

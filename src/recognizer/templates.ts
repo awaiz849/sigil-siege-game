@@ -38,9 +38,10 @@ function cShape(sweepDeg: number, reverse = false): Point[] {
   return reverse ? pts.reverse() : pts;
 }
 
-/** L: straight down, then right along the bottom. footLength = bottom bar / upright bar. */
+/** Mirrored L (⅃): straight down, then LEFT along the bottom. Mirrored so it can't be confused
+ *  with a C, which ends heading right. footLength = bottom bar / upright bar. */
 function ell(footLength: number, reverse = false): Point[] {
-  const pts = [{ x: 0, y: -1 }, { x: 0, y: 1 }, { x: footLength * 2, y: 1 }];
+  const pts = [{ x: 0, y: -1 }, { x: 0, y: 1 }, { x: -footLength * 2, y: 1 }];
   return reverse ? pts.reverse() : pts;
 }
 

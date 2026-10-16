@@ -78,7 +78,7 @@ export function updateEnemies(world: World, dt: number): void {
     }
 
     if (enemy.pos.z >= CONFIG.FIELD.wallZ) {
-      damageCastle(world, enemy.id, CONFIG.WALL_HIT_DAMAGE, 'wall');
+      damageCastle(world, enemy.id, CONFIG.WALL_HIT_DAMAGE[enemy.type], 'wall');
       removeEnemy(world, enemy.id);
     }
   }

@@ -55,8 +55,8 @@ function cArc(sweepDeg: number, reverse = false): Point[] {
   return reverse ? pts.reverse() : pts;
 }
 
-/** L corners: top of the upright, the corner, end of the foot. */
-const TOP = { x: 0, y: -1 }, CORNER = { x: 0, y: 1 }, FOOT = { x: 1.2, y: 1 };
+/** Mirrored L corners: top of the upright, the corner, end of the foot. */
+const TOP = { x: 0, y: -1 }, CORNER = { x: 0, y: 1 }, FOOT = { x: -1.2, y: 1 }; // mirrored L: foot to the left
 
 const cases: Array<[string, Point[]]> = [];
 for (let k = 0; k < 6; k++) {
@@ -67,8 +67,8 @@ for (let k = 0; k < 6; k++) {
   cases.push(['C', humanize(circle(between(0, 360), true))]); // full circle still = water
   cases.push(['C', humanize(circle(between(0, 360), false, 320))]); // nearly full circle
   cases.push(['L', humanize([TOP, CORNER, FOOT])]);
-  cases.push(['L', humanize([TOP, CORNER, { x: 0.5, y: 1 }])]); // short foot
-  cases.push(['L', humanize([TOP, CORNER, { x: 2, y: 1 }])]); // long foot
+  cases.push(['L', humanize([TOP, CORNER, { x: -0.5, y: 1 }])]); // short foot
+  cases.push(['L', humanize([TOP, CORNER, { x: -2, y: 1 }])]); // long foot
   cases.push(['L', humanize([FOOT, CORNER, TOP])]); // drawn backwards
   cases.push(['v', humanize([{ x: -0.6, y: -1 }, { x: 0, y: 1 }, { x: 0.6, y: -1 }])]);
   cases.push(['v', humanize([{ x: -0.3, y: -1 }, { x: 0, y: 1 }, { x: 0.3, y: -1 }])]); // narrow

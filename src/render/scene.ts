@@ -68,6 +68,29 @@ export function createScene(canvas: HTMLCanvasElement) {
   composer.addPass(new OutputPass());
 
   const shots: Shot[] = [];
+  // Ground shockwave rings where spells land.
+  const waves: Array<{ mesh: THREE.Mesh; t: number }> = [];
+  const waveGeo = new THREE.RingGeometry(0.8, 1, 40);
+  waveGeo.rotateX(-Math.PI / 2);
+  function shockwave(x: number, z: number, color: number) {
+    const mesh = new THREE.Mesh(waveGeo, new THREE.MeshBasicMaterial({ color, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+    mesh.position.set(x, 0.06, z);
+    scene.add(mesh);
+    waves.push({ mesh, t: 0 });
+  }
+  function updateWaves(dt: number) {
+    for (let i = waves.length - 1; i >= 0; i--) {
+      const w = waves[i];
+      w.t += dt / 0.45;
+      w.mesh.scale.setScalar(0.5 + w.t * 3);
+      (w.mesh.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 1 - w.t);
+      if (w.t >= 1) {
+        scene.remove(w.mesh);
+        (w.mesh.material as THREE.Material).dispose();
+        waves.splice(i, 1);
+      }
+    }
+  }
   const orbTexture = radialTexture('rgba(255,255,255,1)', 'rgba(255,255,255,0)');
 
   function updateShots(dt: number) {
@@ -82,6 +105,7 @@ export function createScene(canvas: HTMLCanvasElement) {
         scene.remove(s.sprite);
         s.sprite.material.dispose();
         shots.splice(i, 1);
+        shockwave(s.to.x, s.to.z, s.color);
         s.onArrive();
       }
     }
@@ -145,6 +169,7 @@ export function createScene(canvas: HTMLCanvasElement) {
     sky.intensity = CONFIG.NIGHT.ambient + lightningT * 6;
     enemies.update(world, time, dt);
     updateShots(dt);
+    updateWaves(dt);
     particles.update(dt);
 
     // Camera shake (castle hits) + a very slow idle sway so the view feels alive.

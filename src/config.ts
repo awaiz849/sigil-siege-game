@@ -43,8 +43,9 @@ export const CONFIG = {
   CLOSED_GAP_RATIO: 0.25,
 
   // ---- Castle and scoring ----
-  CASTLE_HP: 100,
-  WALL_HIT_DAMAGE: 10,
+  CASTLE_HP: 200,
+  /** Damage when a monster reaches the wall, per type (small ones hurt less). */
+  WALL_HIT_DAMAGE: { imp: 5, bird: 5, warlock: 10, boss: 20 } as Record<'imp' | 'bird' | 'warlock' | 'boss', number>,
   ROUND_SECONDS: 90,
   WAVE_SECONDS: 30,
   KILL_SCORE: 100,
@@ -81,7 +82,7 @@ export const CONFIG = {
   /** Field in three.js world units: enemies spawn at spawnZ and walk +z toward wallZ.
    *  lanes = spawn x positions, halfWidth = how far sideways enemies may be pushed,
    *  laneClearDist = a lane is free when nobody is this close to its spawn point. */
-  FIELD: { spawnZ: -30, wallZ: -4, lanes: [-6, -3, 0, 3, 6], halfWidth: 8, laneClearDist: 3 },
+  FIELD: { spawnZ: -42, wallZ: -4, lanes: [-6, -3, 0, 3, 6], halfWidth: 8, laneClearDist: 3 },
   /** Distance from the wall where the red danger ring shows (renderer reads this). */
   DANGER_DIST: 5,
   /** Collision radius per enemy type (push-apart). */

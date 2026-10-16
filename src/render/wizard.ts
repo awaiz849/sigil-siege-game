@@ -105,6 +105,14 @@ export function createWizard() {
   const light = new THREE.PointLight(PALETTE.gold, 1.5, 6, 2);
   orbGroup.add(light);
 
+  // Rune circle under his feet: appears while drawing, flashes on cast.
+  const runeMat = new THREE.MeshBasicMaterial({ map: runeTexture(), color: PALETTE.gold, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+  const rune = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 2.6), runeMat);
+  rune.rotation.x = -Math.PI / 2;
+  rune.position.y = 0.03;
+  root.add(rune);
+  let runeOpacity = 0;
+
   let pose: Pose = 'other';
   onCursor((_x, _y, p) => (pose = p));
   let castT = 0; // 1 right after a cast, fades to 0
@@ -164,11 +172,20 @@ export function createWizard() {
       orbGlow.scale.setScalar(0.9 * s + (pose === 'palm' ? 0.8 : 0));
       orb.rotation.y = t * 2;
       light.intensity = 1.5 + castT * 4 + (pose === 'palm' ? 1.5 : 0);
+
+      // Rune circle: fades in while drawing, bursts bigger on cast, spins slowly.
+      const want = pose === 'point' ? 0.85 : castT > 0 ? castT : 0;
+      runeOpacity += (want - runeOpacity) * k;
+      runeMat.opacity = runeOpacity;
+      rune.rotation.z = t * 0.6;
+      rune.scale.setScalar(1 + castT * 0.5);
+      if (castT <= 0) runeMat.color.copy(orbColor);
     },
 
     /** A spell was cast: arms thrust, orb flashes in the spell colour. */
     cast(color: number) {
       castT = 1;
+      runeMat.color.set(color);
       orbMat.color.set(color);
       orbMat.emissive.set(color);
       (orbGlow.material as THREE.SpriteMaterial).color.set(color);
@@ -183,3 +200,50 @@ export function createWizard() {
 }
 
 export type Wizard = ReturnType<typeof createWizard>;
+
+/** Magic circle drawn on a canvas: two rings, tick marks, small rune glyphs and a star. */
+function runeTexture(): THREE.CanvasTexture {
+  const size = 256;
+  const c = document.createElement('canvas');
+  c.width = c.height = size;
+  const ctx = c.getContext('2d')!;
+  const m = size / 2;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(m, m, 120, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.arc(m, m, 96, 0, Math.PI * 2);
+  ctx.stroke();
+  // Tick marks between the rings.
+  for (let i = 0; i < 48; i++) {
+    const a = (i / 48) * Math.PI * 2;
+    const r0 = i % 4 === 0 ? 98 : 106;
+    ctx.beginPath();
+    ctx.moveTo(m + Math.cos(a) * r0, m + Math.sin(a) * r0);
+    ctx.lineTo(m + Math.cos(a) * 118, m + Math.sin(a) * 118);
+    ctx.stroke();
+  }
+  // Six-pointed star made of two triangles.
+  ctx.lineWidth = 3;
+  for (const off of [0, Math.PI / 3]) {
+    ctx.beginPath();
+    for (let k = 0; k <= 3; k++) {
+      const a = off + (k / 3) * Math.PI * 2 - Math.PI / 2;
+      const x = m + Math.cos(a) * 92;
+      const y = m + Math.sin(a) * 92;
+      if (k === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  ctx.beginPath();
+  ctx.arc(m, m, 40, 0, Math.PI * 2);
+  ctx.stroke();
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}

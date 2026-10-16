@@ -246,7 +246,7 @@ function runEnemies(world: World, seconds: number): void {
   check('wind with nothing to push = miss', cast(empty, 'line', null).kind === 'miss' && empty.combo === 1 && empty.windCooldown === 0);
 }
 
-// ---- Enemies at the wall: 10 damage, removed. Birds dive. ----
+// ---- Enemies at the wall: damage per type (imp/bird 5), removed. Birds dive. ----
 {
   const w = fresh();
   const imp = spawnEnemy(w, 'imp', 'fire', 0);
@@ -256,7 +256,7 @@ function runEnemies(world: World, seconds: number): void {
   runEnemies(w, (distance - 2) / CONFIG.BIRD.speed);
   check('bird dives near the wall', bird.pos.y < CONFIG.BIRD_FLIGHT.flyY && bird.pos.y > CONFIG.BIRD_FLIGHT.diveY);
   runEnemies(w, distance / CONFIG.IMP.speed);
-  check('wall hits = 2 x 10', w.castleHp === CONFIG.CASTLE_HP - 2 * CONFIG.WALL_HIT_DAMAGE);
+  check('wall hits = imp + bird damage', w.castleHp === CONFIG.CASTLE_HP - CONFIG.WALL_HIT_DAMAGE.imp - CONFIG.WALL_HIT_DAMAGE.bird);
   check('enemies removed at wall', !w.enemies.includes(imp) && !w.enemies.includes(bird));
 }
 
