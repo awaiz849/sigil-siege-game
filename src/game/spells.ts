@@ -18,8 +18,8 @@ export const SIGIL_SPELLS: Record<string, Exclude<SpellName, 'shield' | 'meteor'
 
 /** The Grand Warden's shapes (level 2): cousins of the wizard's. */
 export const WARDEN_SPELLS: Record<string, SpellName> = {
-  U: 'frost',
-  Z: 'flame',
+  O: 'frost',
+  C: 'flame',
   peak: 'thorn',
   M: 'arcane',
   line: 'timewarp',

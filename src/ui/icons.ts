@@ -77,7 +77,7 @@ export function drawElementIcon(ctx: CanvasRenderingContext2D, element: Element,
   ctx.restore();
 }
 
-export type SigilShape = 'C' | 'L' | 'v' | 'zigzag' | 'line' | 'U' | 'Z' | 'peak' | 'M';
+export type SigilShape = 'C' | 'L' | 'v' | 'zigzag' | 'line' | 'O' | 'peak' | 'M';
 
 /** Sigil outline centred on (x, y) inside a `size` box. Lightning is always a W, never a Z. */
 export function drawSigil(ctx: CanvasRenderingContext2D, shape: SigilShape, x: number, y: number, size: number, color: string, lineWidth = 3) {
@@ -116,17 +116,8 @@ export function drawSigil(ctx: CanvasRenderingContext2D, shape: SigilShape, x: n
       ctx.lineTo(x + h, y);
       break;
     // Grand Warden (level 2)
-    case 'U':
-      ctx.moveTo(x - h * 0.7, y - h * 0.8);
-      ctx.lineTo(x - h * 0.7, y);
-      ctx.arc(x, y, h * 0.7, Math.PI, 0, true);
-      ctx.lineTo(x + h * 0.7, y - h * 0.8);
-      break;
-    case 'Z':
-      ctx.moveTo(x - h * 0.7, y - h * 0.8);
-      ctx.lineTo(x + h * 0.7, y - h * 0.8);
-      ctx.lineTo(x - h * 0.7, y + h * 0.8);
-      ctx.lineTo(x + h * 0.7, y + h * 0.8);
+    case 'O':
+      ctx.arc(x, y, h * 0.75, -Math.PI / 2, Math.PI * 1.5);
       break;
     case 'peak':
       ctx.moveTo(x - h * 0.6, y + h * 0.8);
@@ -151,10 +142,10 @@ export const COUNTER_SIGIL: Record<Element, SigilShape> = {
   nature: 'L', // fire beats nature
   water: 'v', // nature beats water
 };
-/** Same for each hero: the Grand Warden's frost (U), soul flame (Z) and thorn (peak). */
+/** Same for each hero: the Grand Warden's frost (O), soul flame (C) and thorn (peak). */
 export const COUNTER_SIGIL_BY_HERO: Record<'wizard' | 'warden', Record<Element, SigilShape>> = {
   wizard: COUNTER_SIGIL,
-  warden: { fire: 'U', nature: 'Z', water: 'peak' },
+  warden: { fire: 'O', nature: 'C', water: 'peak' },
 };
 
 /** Rounded rectangle path helper. */

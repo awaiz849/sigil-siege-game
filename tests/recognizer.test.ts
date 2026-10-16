@@ -81,15 +81,14 @@ for (let k = 0; k < 6; k++) {
 }
 
 // Grand Warden (level 2): his own shapes, classified against his set only.
-const cupPts = (depth: number) => [{ x: -1, y: -depth }, ...circle(180, false, 180), { x: 1, y: -depth }];
 const wardenCases: Array<[string, Point[]]> = [];
 for (let k = 0; k < 6; k++) {
-  wardenCases.push(['U', humanize(cupPts(between(0.3, 0.9)))]);
-  wardenCases.push(['U', humanize(cupPts(between(0.2, 0.8)).reverse())]); // right-to-left
-  wardenCases.push(['U', humanize(cupPts(between(0.3, 0.8)), { noise: 0.07 })]); // shaky
-  wardenCases.push(['Z', humanize([{ x: -0.8, y: -1 }, { x: 0.8, y: -1 }, { x: -0.8, y: 1 }, { x: 0.8, y: 1 }])]);
-  wardenCases.push(['Z', humanize([{ x: -0.5, y: -1 }, { x: 0.5, y: -1 }, { x: -0.5, y: 1 }, { x: 0.5, y: 1 }])]); // narrow
-  wardenCases.push(['Z', humanize([{ x: 0.8, y: 1 }, { x: -0.8, y: 1 }, { x: 0.8, y: -1 }, { x: -0.8, y: -1 }])]); // backwards
+  wardenCases.push(['C', humanize(cArc(between(240, 290)))]); // soul flame: C
+  wardenCases.push(['C', humanize(cArc(between(180, 220)))]);
+  wardenCases.push(['C', humanize(cArc(between(230, 280), true))]); // drawn bottom-up
+  wardenCases.push(['O', humanize(circle(between(0, 360), true))]); // frost nova: circle
+  wardenCases.push(['O', humanize(circle(between(0, 360), false))]);
+  wardenCases.push(['O', humanize(circle(between(0, 360), true, 330), { noise: 0.06 })]); // small gap, shaky
   wardenCases.push(['peak', humanize([{ x: -0.45, y: 1 }, { x: 0, y: -1 }, { x: 0.45, y: 1 }])]);
   wardenCases.push(['peak', humanize([{ x: -0.25, y: 1 }, { x: 0, y: -1 }, { x: 0.25, y: 1 }])]); // narrow
   wardenCases.push(['peak', humanize([{ x: 0.45, y: 1 }, { x: 0, y: -1 }, { x: -0.45, y: 1 }])]); // right-to-left

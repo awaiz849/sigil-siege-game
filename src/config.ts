@@ -96,7 +96,7 @@ export const CONFIG = {
    *  a throw drops a meteor on the monster nearest the aim point and damages everything within
    *  radius (world units). Meteor kills don't refill the meter. */
   METEOR: { meterMax: 100, perKill: 10, perPerfect: 10, damage: 3, radius: 6 },
-  /** Level 2: the GRAND WARDEN's spells (shapes: U frost, Z flame, peak thorn, M arcane, line time warp,
+  /** Level 2: the GRAND WARDEN's spells (shapes: O frost, C flame, peak thorn, M arcane, line time warp,
    *  open palm eternal tome). frost: water hit + splash of splashDamage within frostRadius.
    *  flame: fire hit, then burnDamage more after burnS. thorn: nature hit + rooted (stunned) rootS.
    *  arcane: 1 damage to all + slowed arcaneSlowS, cooldown. timewarp: walkers move at slowFactor speed

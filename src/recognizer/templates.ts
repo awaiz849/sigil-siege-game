@@ -4,23 +4,23 @@ import type { Point } from '../events.ts';
 import { makeTemplate, type Template } from './dollar.ts';
 
 /** Every name the recognizer can return (besides null).
- *  Wizard (level 1): C, L (mirrored L), v, zigzag (W), line.
- *  Grand Warden (level 2): cousins of those shapes: U (cup), Z, peak (Λ), M, line. */
-export type SigilName = 'line' | 'v' | 'zigzag' | 'C' | 'L' | 'U' | 'Z' | 'peak' | 'M';
-export const SIGIL_NAMES: SigilName[] = ['line', 'v', 'zigzag', 'C', 'L', 'U', 'Z', 'peak', 'M'];
+ *  Wizard (level 1): C, L (mirrored L), v, zigzag (W), line; a full circle O also counts as his C.
+ *  Grand Warden (level 2): C, O (full circle), peak (Λ), M, line. */
+export type SigilName = 'line' | 'v' | 'zigzag' | 'C' | 'L' | 'O' | 'peak' | 'M';
+export const SIGIL_NAMES: SigilName[] = ['line', 'v', 'zigzag', 'C', 'L', 'O', 'peak', 'M'];
 
 /** Which hero draws which shapes. $1 ignores rotation, so each hero only matches his own set
- *  (a U is a C turned round, an M a W upside down: never in the same set). */
+ *  (an M is a W upside down, a Λ a V: never in the same set). The wizard's O is read as his C. */
 export type Hero = 'wizard' | 'warden';
 export const HERO_SHAPES: Record<Hero, SigilName[]> = {
-  wizard: ['C', 'L', 'v', 'zigzag'],
-  warden: ['U', 'Z', 'peak', 'M'],
+  wizard: ['C', 'L', 'v', 'zigzag', 'O'],
+  warden: ['C', 'O', 'peak', 'M'],
 };
 
 /** Closed shapes end near where they started; open shapes do not.
- *  C (water) is in both lists: a C is open, but a full circle also counts as water. */
-export const CLOSED_SHAPES: SigilName[] = ['C'];
-export const OPEN_SHAPES: SigilName[] = ['v', 'zigzag', 'L', 'C', 'U', 'Z', 'peak', 'M'];
+ *  C and O are in both lists: a sloppy circle can leave a gap, a C can nearly close. */
+export const CLOSED_SHAPES: SigilName[] = ['C', 'O'];
+export const OPEN_SHAPES: SigilName[] = ['v', 'zigzag', 'L', 'C', 'O', 'peak', 'M'];
 
 /** Circle starting at the top. sweepDeg < 360 = left a gap, > 360 = went round too far
  *  (both are common when drawing in the air). Increasing angle = clockwise on screen (y down). */
@@ -71,23 +71,6 @@ function zigzag(valleys: number, rightToLeft = false): Point[] {
   return rightToLeft ? pts.reverse() : pts;
 }
 
-/** U (cup): down the left side, round the bottom, up the right side. depth = straight sides. */
-function cup(depth: number, rightToLeft = false): Point[] {
-  const pts: Point[] = [{ x: -1, y: -depth }];
-  for (let i = 0; i <= 18; i++) {
-    const a = Math.PI - (i / 18) * Math.PI; // left -> bottom -> right (y down on screen)
-    pts.push({ x: Math.cos(a), y: Math.sin(a) });
-  }
-  pts.push({ x: 1, y: -depth });
-  return rightToLeft ? pts.reverse() : pts;
-}
-
-/** Z: along the top to the right, diagonally down to the bottom-left, along the bottom to the right. */
-function zed(width: number, reverse = false): Point[] {
-  const pts = [{ x: -width, y: -1 }, { x: width, y: -1 }, { x: -width, y: 1 }, { x: width, y: 1 }];
-  return reverse ? pts.reverse() : pts;
-}
-
 /** Λ (peak): up from the bottom-left to a sharp top, down to the bottom-right. */
 function peak(halfWidth: number, rightToLeft = false): Point[] {
   const pts = [{ x: -halfWidth, y: 1 }, { x: 0, y: -1 }, { x: halfWidth, y: 1 }];
@@ -107,8 +90,12 @@ export function builtInTemplates(): Template[] {
     makeTemplate('C', cShape(180)), // half circle
     makeTemplate('C', cShape(270, true)), // drawn from the bottom up
     makeTemplate('C', cShape(200, true)),
-    makeTemplate('C', circle(true)), // a full circle still counts as water
-    makeTemplate('C', circle(false)),
+    makeTemplate('O', circle(true)), // full circle (the wizard reads it as his C)
+    makeTemplate('O', circle(false)),
+    makeTemplate('O', circle(true, 330)), // a circle with a small gap
+    makeTemplate('O', circle(false, 330)),
+    makeTemplate('O', circle(true, 390)), // went round a bit too far
+    makeTemplate('O', circle(false, 390)),
     makeTemplate('L', ell(0.6)), // normal
     makeTemplate('L', ell(0.3)), // short foot
     makeTemplate('L', ell(1)), // long foot
@@ -122,18 +109,6 @@ export function builtInTemplates(): Template[] {
     makeTemplate('zigzag', zigzag(3)), // 3 valleys
     makeTemplate('zigzag', zigzag(3, true)),
     // Grand Warden (level 2)
-    makeTemplate('U', cup(0.6)), // classic cup
-    makeTemplate('U', cup(0)), // shallow bowl
-    makeTemplate('U', cup(1.2)), // deep
-    makeTemplate('U', cup(0.6, true)), // right-to-left
-    makeTemplate('U', cup(0.3)),
-    makeTemplate('U', cup(0.3, true)),
-    makeTemplate('U', cup(0.9, true)), // deep, right-to-left (else it can pass for a 7)
-    makeTemplate('U', cup(1.2, true)),
-    makeTemplate('Z', zed(0.8)),
-    makeTemplate('Z', zed(0.5)), // narrow
-    makeTemplate('Z', zed(1.2)), // wide
-    makeTemplate('Z', zed(0.8, true)), // drawn backwards
     makeTemplate('peak', peak(0.45)),
     makeTemplate('peak', peak(0.25)), // narrow
     makeTemplate('peak', peak(0.45, true)), // right-to-left

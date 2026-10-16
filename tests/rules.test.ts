@@ -392,23 +392,23 @@ check('castle HP hard 100', createWorld('hard').castleHp === 100);
   const W = CONFIG.WARDEN;
   const warden = (): World => startRound(createWorld('normal', 42, 'warden'));
 
-  // Frost (U, water): hits the target, splashes monsters close to it, not ones far away.
+  // Frost (O = circle, water): hits the target, splashes monsters close to it, not ones far away.
   const w = warden();
   const target = spawnEnemy(w, 'imp', 'nature', 0);
   const near = spawnEnemy(w, 'imp', 'nature', 2);
   const far = spawnEnemy(w, 'imp', 'nature', 6);
   for (const e of [target, near, far]) e.hp = 5;
-  const r = cast(w, 'U', target);
-  check('warden U = frost', r.spell === 'frost' && r.kind === 'hit');
+  const r = cast(w, 'O', target);
+  check('warden O = frost', r.spell === 'frost' && r.kind === 'hit');
   check('frost hits target (water vs nature = x1)', near_(target.hp, 4));
   check('frost splashes nearby', near_(near.hp, 5 - W.splashDamage) && far.hp === 5, `${near.hp} ${far.hp}`);
-  check('wizard shapes do nothing for the warden', cast(w, 'C', target).kind === 'fizzle');
+  check('wizard-only shapes do nothing for the warden', cast(w, 'L', target).kind === 'fizzle' && cast(w, 'v', target).kind === 'fizzle');
 
-  // Flame (Z, fire): hit now, burn later.
+  // Flame (C, fire): hit now, burn later.
   const f = warden();
   const imp = spawnEnemy(f, 'imp', 'nature', 0); // fire beats nature: 2 + 2
   imp.hp = 6;
-  cast(f, 'Z', imp);
+  cast(f, 'C', imp);
   check('flame hits (super effective)', imp.hp === 4 && imp.burnT === W.burnS);
   for (let t = 0; t < W.burnS + 0.1; t += 0.05) update(f, 0.05);
   check('flame burns again', imp.hp === 4 - W.burnDamage * 2 && imp.burnT === 0, String(imp.hp));
@@ -450,7 +450,7 @@ check('castle HP hard 100', createWorld('hard').castleHp === 100);
   update(tm, 0.05);
   check('tome: castle takes no damage', tm.castleHp === hpBefore);
   check('tome on cooldown', castShield(tm).kind === 'cooldown');
-  check('counter-shape hint uses the warden shapes', counterShape('fire', 'warden') === 'U' && counterShape('fire') === 'C');
+  check('counter-shape hint uses the warden shapes', counterShape('fire', 'warden') === 'O' && counterShape('nature', 'warden') === 'C' && counterShape('fire') === 'C');
 }
 
 // ---- End-screen stats: accuracy, favourite spell, best combo, score per stroke ----

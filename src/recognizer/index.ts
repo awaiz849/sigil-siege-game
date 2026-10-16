@@ -18,6 +18,11 @@ export function setRecordedTemplates(templates: Template[]): void {
   recorded = templates;
 }
 
+/** The wizard has no O: a full circle is his C (water). */
+function asHero(name: SigilName, hero: Hero): SigilName {
+  return hero === 'wizard' && name === 'O' ? 'C' : name;
+}
+
 export function classify(points: Point[], hero: Hero = 'wizard'): Classification {
   if (points.length < 2) return { name: null, score: 0 };
 
@@ -31,13 +36,13 @@ export function classify(points: Point[], hero: Hero = 'wizard'): Classification
   // First try only the shapes that fit the precheck.
   const first = recognize(points, all.filter((t) => group.includes(t.name as SigilName)));
   if (first.name && first.score >= CONFIG.RECOGNIZER_THRESHOLD) {
-    return { name: first.name as SigilName, score: first.score };
+    return { name: asHero(first.name as SigilName, hero), score: first.score };
   }
 
   // Not confident: the precheck may have been wrong (e.g. a circle with a big gap). Retry all.
   const retry = recognize(points, all);
   if (retry.name && retry.score >= CONFIG.RECOGNIZER_THRESHOLD) {
-    return { name: retry.name as SigilName, score: retry.score };
+    return { name: asHero(retry.name as SigilName, hero), score: retry.score };
   }
   return { name: null, score: Math.max(first.score, retry.score) }; // FIZZLE
 }

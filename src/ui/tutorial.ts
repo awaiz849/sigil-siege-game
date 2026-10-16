@@ -33,8 +33,8 @@ const WIZARD_STEPS: Step[] = [
 
 /** Level 2: the Grand Warden's spells (cousins of the wizard's shapes). */
 const WARDEN_STEPS: Step[] = [
-  { shape: 'U', name: 'FROST NOVA', color: ELEMENT_CSS.water, how: 'Draw a U: down, round the bottom, back up', what: 'Hits one monster and splashes the ones next to it.', beats: 'fire' },
-  { shape: 'Z', name: 'SOUL FLAME', color: ELEMENT_CSS.fire, how: 'Draw a Z: right, diagonal down-left, right again', what: 'Hits one monster, and it burns again 2 s later.', beats: 'nature' },
+  { shape: 'O', name: 'FROST NOVA', color: ELEMENT_CSS.water, how: 'Draw a circle: all the way round, back to where you started', what: 'Hits one monster and splashes the ones next to it.', beats: 'fire' },
+  { shape: 'C', name: 'SOUL FLAME', color: ELEMENT_CSS.fire, how: 'Draw a C: start top right, curve round to the left, end bottom right', what: 'Hits one monster, and it burns again 2 s later.', beats: 'nature' },
   { shape: 'peak', name: 'THORN SPIRE', color: ELEMENT_CSS.nature, how: 'Draw a peak: up to a point, then back down', what: 'Hits one monster and roots it: frozen, double damage.', beats: 'water' },
   { shape: 'M', name: 'ARCANE RAIN', color: '#c9a0ff', how: 'Draw an M: up, down, up, down', what: 'Hits EVERY monster and slows them. 10 s cooldown.' },
   { shape: 'line', name: 'TIME WARP', color: '#b8a0ff', how: 'Draw one straight line', what: 'Every walking monster moves at half speed for 5 s.' },
@@ -43,7 +43,7 @@ const WARDEN_STEPS: Step[] = [
 const STEPS_BY_HERO: Record<Hero, Step[]> = { wizard: WIZARD_STEPS, warden: WARDEN_STEPS };
 
 /** Recognizer name for each tutorial shape (the same names the game uses). */
-const SHAPE_NAME: Record<SigilShape, string> = { C: 'C', L: 'L', v: 'v', zigzag: 'zigzag', line: 'line', U: 'U', Z: 'Z', peak: 'peak', M: 'M' };
+const SHAPE_NAME: Record<SigilShape, string> = { C: 'C', L: 'L', v: 'v', zigzag: 'zigzag', line: 'line', O: 'O', peak: 'peak', M: 'M' };
 
 type Pt = { x: number; y: number };
 
@@ -64,15 +64,13 @@ function sigilPath(shape: SigilShape, x: number, y: number, size: number): Pt[] 
     pts = [{ x: x - h * 0.7, y: y - h * 0.8 }, { x, y: y + h * 0.8 }, { x: x + h * 0.7, y: y - h * 0.8 }];
   } else if (shape === 'zigzag') {
     pts = [-1, -0.5, 0, 0.5, 1].map((u, i) => ({ x: x + u * h, y: y + (i % 2 === 0 ? -0.7 : 0.7) * h }));
-  } else if (shape === 'U') {
-    pts = [{ x: x - h * 0.7, y: y - h * 0.8 }];
-    for (let k = 0; k <= 30; k++) {
-      const a = Math.PI - (k / 30) * Math.PI;
-      pts.push({ x: x + Math.cos(a) * h * 0.7, y: y + Math.sin(a) * h * 0.7 });
+  } else if (shape === 'O') {
+    // Full circle from the top, round to the left (anticlockwise on screen), back to the top.
+    pts = [];
+    for (let k = 0; k <= 48; k++) {
+      const a = -Math.PI / 2 - (k / 48) * Math.PI * 2;
+      pts.push({ x: x + Math.cos(a) * h * 0.75, y: y + Math.sin(a) * h * 0.75 });
     }
-    pts.push({ x: x + h * 0.7, y: y - h * 0.8 });
-  } else if (shape === 'Z') {
-    pts = [{ x: x - h * 0.7, y: y - h * 0.8 }, { x: x + h * 0.7, y: y - h * 0.8 }, { x: x - h * 0.7, y: y + h * 0.8 }, { x: x + h * 0.7, y: y + h * 0.8 }];
   } else if (shape === 'peak') {
     pts = [{ x: x - h * 0.6, y: y + h * 0.8 }, { x, y: y - h * 0.8 }, { x: x + h * 0.6, y: y + h * 0.8 }];
   } else if (shape === 'M') {
