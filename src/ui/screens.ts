@@ -1,6 +1,7 @@
 // Screens, all on the overlay canvas over the live 3D scene:
 //   handCheck  show palm, then point (live camera preview + skeleton)   -> title
 //   title      hover a difficulty button 0.8 s to pick it, hold palm 1.2 s (or hover START) to start
+//   tutorial   how to draw every sigil (tutorial.ts); runs before the very first round, HOW TO PLAY replays it
 //   pause      RESUME / RESTART / EXIT TO MENU; hold palm to resume
 //   end        victory / defeat, score + stats, PLAY AGAIN / CHANGE DIFFICULTY, hold palm to play again
 // Everything works hands-free (dwell.ts buttons + palmHold.ts). Mouse clicks and keys work too:
@@ -16,8 +17,9 @@ import { sound } from '../audio/sound.ts';
 import { drawHandPreview } from './debugOverlay.ts';
 import { FONT_TEXT, FONT_TITLE } from './fonts.ts';
 import { drawPalm, drawSigil, ELEMENT_CSS, GOLD, NAVY, roundRect } from './icons.ts';
+import { createTutorial, tutorialDone } from './tutorial.ts';
 
-export type ScreenName = 'handCheck' | 'title' | 'pause' | 'end';
+export type ScreenName = 'handCheck' | 'title' | 'tutorial' | 'pause' | 'end';
 export type CameraState = 'loading' | 'ready' | 'failed';
 
 type Opts = {
@@ -76,7 +78,34 @@ export function createScreens(opts: Opts) {
     const s = scale();
     return { x: W - 16 * s - 150 * s, y: 84 * s, w: 150 * s, h: 44 * s };
   }
+  /** Bottom-right corner button (SKIP TUTORIAL, HOW TO PLAY). */
+  function cornerRect(): Rect {
+    const s = scale();
+    return { x: W - 16 * s - 240 * s, y: H - 16 * s - 50 * s, w: 240 * s, h: 50 * s };
+  }
   const offscreen: Rect = { x: -1e6, y: -1e6, w: 0, h: 0 };
+
+  // ---- tutorial: before the first round ever, or from HOW TO PLAY
+  const tutorial = createTutorial();
+  let startAfterTutorial = false;
+  let wasReadyPage = false;
+  function openTutorial(thenStart: boolean) {
+    sound.select();
+    startAfterTutorial = thenStart;
+    tutorial.reset();
+    show('tutorial');
+  }
+  function finishTutorial() {
+    if (startAfterTutorial) {
+      startAfterTutorial = false;
+      sound.start();
+      screen = null;
+      opts.onStart(difficulty);
+    } else {
+      sound.select();
+      show('title');
+    }
+  }
 
   // ---- actions (shared by hover, click and keys)
   function pickDifficulty(d: Difficulty) {
@@ -84,6 +113,7 @@ export function createScreens(opts: Opts) {
     sound.select();
   }
   function start() {
+    if (!tutorialDone()) return openTutorial(true); // first time: learn the shapes first
     sound.start();
     screen = null;
     opts.onStart(difficulty);
@@ -130,9 +160,15 @@ export function createScreens(opts: Opts) {
       show('title');
     }),
   ];
+  const howToButton = makeButton(() => screen === 'title', cornerRect, 'HOW TO PLAY', () => openTutorial(false));
+  const tutorialButtons = [
+    makeButton(() => screen === 'tutorial' && !tutorial.onReadyPage, cornerRect, 'SKIP TUTORIAL', () => tutorial.skipAll()),
+    makeButton(() => screen === 'tutorial' && tutorial.canSkipStep, () => stackRect(0, H * 0.86), 'NEXT', () => tutorial.skipStep()),
+    makeButton(() => screen === 'tutorial' && tutorial.onReadyPage, () => stackRect(0, H * 0.7), "LET'S GO!", finishTutorial),
+  ];
   // In game: a longer hover, so aiming near the corner never pauses by accident.
   const pauseGameButton = makeButton(() => screen === null && opts.playing(), pauseRect, 'II  PAUSE', pause, CONFIG.PAUSE_HOVER_S);
-  const allButtons = [...difficultyButtons, startButton, ...pauseButtons, ...endButtons, pauseGameButton];
+  const allButtons = [...difficultyButtons, startButton, howToButton, ...tutorialButtons, ...pauseButtons, ...endButtons, pauseGameButton];
 
   // Mouse: a left click on a live button presses it (overlay pixels = CSS pixels).
   window.addEventListener('click', (e) => {
@@ -151,6 +187,12 @@ export function createScreens(opts: Opts) {
     const confirm = e.key === 'Enter' || e.key === ' ';
     const back = e.key === 'Escape' || e.key === 'p' || e.key === 'P';
     if (screen === 'handCheck' && confirm) show('title');
+    else if (screen === 'tutorial') {
+      if (e.key === 'Escape') tutorial.skipAll();
+      else if (confirm && tutorial.onReadyPage) finishTutorial();
+      else if (confirm && tutorial.canSkipStep) tutorial.skipStep();
+      else return;
+    } else if (screen === 'title' && (e.key === 'h' || e.key === 'H')) openTutorial(false);
     else if (screen === 'title') {
       const i = DIFFICULTIES.indexOf(difficulty);
       if (e.key >= '1' && e.key <= '3') pickDifficulty(DIFFICULTIES[Number(e.key) - 1]);
@@ -170,10 +212,11 @@ export function createScreens(opts: Opts) {
     if (document.hidden) pause();
   });
 
-  // Hold palm: start (title), play again (end) or resume (pause).
+  // Hold palm: start (title, tutorial's last page), play again (end) or resume (pause).
   const palmHold = createPalmHold(() => {
     if (screen === 'title' || screen === 'end') start();
     else if (screen === 'pause') resume();
+    else if (screen === 'tutorial' && tutorial.onReadyPage) finishTutorial();
   });
 
   function show(name: ScreenName, world?: World) {
@@ -235,6 +278,12 @@ export function createScreens(opts: Opts) {
       const dt = Math.min(0.1, (now - lastNow) / 1000);
       lastNow = now;
       if (screen === 'handCheck') updateHandCheck(dt);
+      if (screen === 'tutorial') {
+        tutorial.update(now);
+        // Reaching the last page: an open palm from the shield page must close before it can start the round.
+        if (tutorial.onReadyPage && !wasReadyPage) palmHold.reset();
+        wasReadyPage = tutorial.onReadyPage;
+      }
       allButtons.forEach((b) => b.dwell.update(now));
       palmHold.update(now);
     },
@@ -258,9 +307,18 @@ export function createScreens(opts: Opts) {
       ctx.textBaseline = 'middle';
       if (screen === 'handCheck') drawHandCheck(ctx, s, now);
       else if (screen === 'title') drawTitle(ctx, s, now);
+      else if (screen === 'tutorial') drawTutorial(ctx, s, now);
       else if (screen === 'pause') drawPause(ctx, s, now);
       else drawEnd(ctx, s, now);
       ctx.restore();
+    },
+
+    /** A finished stroke / an open palm while the tutorial shows (main.ts forwards them). */
+    tutorialStroke(name: string | null) {
+      tutorial.stroke(name);
+    },
+    tutorialPalm() {
+      tutorial.palm();
     },
 
     /** During a round: the pause button (hover, click, or Esc / P). */
@@ -386,8 +444,21 @@ export function createScreens(opts: Opts) {
       button(ctx, r, d.toUpperCase(), difficulty === d, difficultyButtons[i].dwell.progress, s, `best ${bestScore(d)}`);
     });
     drawButton(ctx, startButton, true, s);
+    drawButton(ctx, howToButton, false, s, 18);
 
     confirmPrompt(ctx, s, now, H * 0.56 + 186 * s, 'TO START', 'or press ENTER');
+  }
+
+  // ---------------------------------------------------------------- tutorial
+
+  function drawTutorial(ctx: CanvasRenderingContext2D, s: number, now: number) {
+    tutorial.draw(ctx, W, H, s, now, opts.mouseMode());
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    tutorialButtons.forEach((b, i) => {
+      if (b.rect().x > -1e5) drawButton(ctx, b, i === 2, s, i === 0 ? 18 : 22);
+    });
+    if (tutorial.onReadyPage) confirmPrompt(ctx, s, now, H * 0.7 + 86 * s, startAfterTutorial ? 'TO START' : 'TO GO BACK', 'or press ENTER');
   }
 
   // ---------------------------------------------------------------- pause

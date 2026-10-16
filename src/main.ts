@@ -125,7 +125,8 @@ onStrokeEnd((points) => {
   const shape = classify(points);
   const centre = overlay.worldUi.strokeCentre(points)!;
   if (debugOverlay.isVisible()) overlay.showDebugLabel(`${shape.name ?? 'no match'} ${shape.score.toFixed(2)}`, centre.x, centre.y);
-  if (world.phase !== 'PLAYING' || screens.current) return; // menus: strokes do nothing
+  if (screens.current === 'tutorial') return screens.tutorialStroke(shape.name); // practice the shapes
+  if (world.phase !== 'PLAYING' || screens.current) return; // other menus: strokes do nothing
   const result = castSpell(world, shape.name, centre, world3d.project);
   overlay.worldUi.burnStroke(result, performance.now());
   showCast(result, centre);
@@ -133,6 +134,7 @@ onStrokeEnd((points) => {
 
 // Open palm = shield, instantly.
 onPalm(() => {
+  if (screens.current === 'tutorial') screens.tutorialPalm();
   if (world.phase === 'PLAYING' && !screens.current) showCast(castShield(world));
 });
 
