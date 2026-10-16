@@ -30,6 +30,7 @@ const strokePoint = channel<[x: number, y: number]>();
 const strokeEnd = channel<[points: Point[]]>();
 const palm = channel<[]>();
 const cursor = channel<[x: number, y: number, pose: Pose]>();
+const throwGesture = channel<[x: number, y: number]>();
 
 /** Pen went down: a new stroke begins. */
 export const onStrokeStart = strokeStart.on;
@@ -50,3 +51,7 @@ export const emitPalm = palm.emit;
 /** Cursor position + pose every frame (hover menus, aim preview). */
 export const onCursor = cursor.on;
 export const emitCursor = cursor.emit;
+
+/** Fast hand "throw" (METEOR ultimate). x, y = the aim point (overlay pixels). */
+export const onThrow = throwGesture.on;
+export const emitThrow = throwGesture.emit;

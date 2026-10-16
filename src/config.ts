@@ -21,6 +21,11 @@ export const CONFIG = {
   PINCH_ON: 0.25,
   PINCH_OFF: 0.4,
   PINCH_RELEASE_MS: 100,
+  /** METEOR throw gesture (input/throwDetector.ts): the hand must move across the camera view at
+   *  >= speed hand-lengths per second for frames frames in a row (pen up). cooldownMs between throws,
+   *  aimLookbackMs = aim where the cursor was this long before the throw fired,
+   *  maxGapS = a longer gap between camera frames resets the measurement. */
+  THROW: { speed: 8, frames: 2, cooldownMs: 800, aimLookbackMs: 200, maxGapS: 0.2 },
   /** Strokes shorter than this are ignored. */
   MIN_STROKE_POINTS: 8,
   MIN_STROKE_PX: 40,

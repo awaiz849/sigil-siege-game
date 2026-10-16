@@ -7,12 +7,14 @@
 //   other (fist etc.)   -> also ends the stroke (forgiving: a drifting hand still casts)
 //   palm (four fingers) -> shield; cancels a stroke in progress
 // Pinch mode (fallback): pinch thumb + index = pen down, release = pen up. Palm still = shield.
+// Both modes: a fast flick of the hand while the pen is up = THROW (meteor ultimate).
 import { HandLandmarker } from '@mediapipe/tasks-vision';
 import { CONFIG } from '../config.ts';
-import { emitCursor, emitPalm, emitStrokeEnd, emitStrokePoint, emitStrokeStart, type Point, type Pose } from '../events.ts';
+import { emitCursor, emitPalm, emitStrokeEnd, emitStrokePoint, emitStrokeStart, emitThrow, type Point, type Pose } from '../events.ts';
 import { OneEuroFilter } from './oneEuro.ts';
 import { classifyPose, pinchRatio, PoseStabilizer, type Landmark } from './poses.ts';
 import { isStrokeLongEnough } from './strokeFilter.ts';
+import { ThrowDetector } from './throwDetector.ts';
 
 const BASE = `${import.meta.env.BASE_URL}mediapipe/`;
 
@@ -39,6 +41,9 @@ export async function createHandInput() {
   let points: Point[] = [];
 
   let lastCursor: Point = { x: 0, y: 0 };
+
+  // Fast flick = throw (meteor). Only while the pen is up, so drawing never fires it.
+  const throwDetector = new ThrowDetector();
 
   // Smoothed cursor in screen pixels.
   const fx = new OneEuroFilter(CONFIG.ONE_EURO_MIN_CUTOFF, CONFIG.ONE_EURO_BETA);
@@ -91,6 +96,7 @@ export async function createHandInput() {
     debug.landmarks = [];
     endStroke(false); // hand left the camera: drop the stroke
     stabilizer.reset();
+    throwDetector.reset();
     stablePose = 'other';
     pinched = false;
     releaseSince = null;
@@ -144,6 +150,13 @@ export async function createHandInput() {
 
     if (drawing) addPoint(x, y);
     lastCursor = { x, y };
+
+    // 4. Throw gesture (meteor), pen up only.
+    if (drawing) throwDetector.reset();
+    else {
+      const aim = throwDetector.push(now, lm, lastCursor);
+      if (aim) emitThrow(aim.x, aim.y);
+    }
     emitCursor(x, y, drawing ? 'point' : stablePose === 'point' ? 'other' : stablePose);
   }
 

@@ -2,8 +2,9 @@
 // so the rest of the game cannot tell the difference.
 // Mouse position is already in overlay pixels (CSS px, origin top-left), no mirroring needed.
 // Left drag = draw. Right button held = open palm (shield, and hold to start / play again).
+// Middle button = hand "throw" (meteor ultimate) aimed at the cursor.
 import { CONFIG } from '../config.ts';
-import { emitCursor, emitPalm, emitStrokeEnd, emitStrokePoint, emitStrokeStart, type Point, type Pose } from '../events.ts';
+import { emitCursor, emitPalm, emitStrokeEnd, emitStrokePoint, emitStrokeStart, emitThrow, type Point, type Pose } from '../events.ts';
 import { isStrokeLongEnough } from './strokeFilter.ts';
 
 export function createMouseInput() {
@@ -36,6 +37,11 @@ export function createMouseInput() {
   });
 
   window.addEventListener('mousedown', (e) => {
+    // Middle button = the hand "throw" (meteor ultimate), aimed at the cursor.
+    if (enabled && e.button === 1 && !drawing) {
+      e.preventDefault();
+      emitThrow(e.clientX, e.clientY);
+    }
     if (enabled && e.button === 2 && !drawing) {
       palm = true;
       emitPalm();
