@@ -141,6 +141,8 @@ export const CONFIG = {
   /** Overlay (HUD) resolution cap: draws at the screen's real pixel density for crisp text. */
   OVERLAY_MAX_PIXEL_RATIO: 2,
   SHADOWS: false,
+  /** Comic ink outlines (post-process): colour, line width in pixels, fade-out distance range. */
+  INK: { enabled: true, color: 0x07050f, thickness: 1.2, fadeStart: 30, fadeEnd: 70 },
   /** Glow on emissive things. Turn off first if FPS drops (after shadows). */
   BLOOM: { enabled: true, strength: 0.9, radius: 0.55, threshold: 0.8, resolutionScale: 0.5 },
   /** Automatic quality: if FPS stays under minFps for `seconds`, step down

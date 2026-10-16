@@ -2,6 +2,7 @@
 // them every frame, and plays a death or wall-crash effect when an enemy disappears.
 // Reads the World only; never changes it.
 import * as THREE from 'three';
+import { toon } from './toon.ts';
 import { CONFIG } from '../config.ts';
 import type { Enemy, World } from '../game/types.ts';
 import { createEnemyModel, type EnemyModel } from './models.ts';
@@ -15,7 +16,7 @@ type View = {
   stunStars: THREE.Group;
   element: Enemy['element'];
   /** Body materials (not the bright glow ones): flashed white when the enemy is hit. */
-  flashMats: Array<{ mat: THREE.MeshStandardMaterial; base: THREE.Color; baseIntensity: number }>;
+  flashMats: Array<{ mat: THREE.MeshToonMaterial; base: THREE.Color; baseIntensity: number }>;
   hp: number;
   hitT: number; // 1 right after a hit, fades to 0
   stepT: number; // time to the next footstep dust puff
@@ -41,7 +42,7 @@ export function createEnemyView(scene: THREE.Scene, particles: Particles, onArch
   shadowGeo.rotateX(-Math.PI / 2);
   const shadowTex = radialTexture('rgba(0,0,0,0.65)', 'rgba(0,0,0,0)');
   const starGeo = new THREE.OctahedronGeometry(0.14);
-  const starMat = new THREE.MeshStandardMaterial({ color: 0xbfefff, emissive: 0x9fe6ff, emissiveIntensity: 2 });
+  const starMat = toon({ color: 0xbfefff, emissive: 0x9fe6ff, emissiveIntensity: 2 });
 
   function add(enemy: Enemy, t: number) {
     const model = createEnemyModel(enemy.type, enemy.element);
@@ -58,10 +59,10 @@ export function createEnemyView(scene: THREE.Scene, particles: Particles, onArch
     stunStars.visible = false;
     model.group.add(stunStars);
     scene.add(model.group, shadow);
-    const flashMats = new Set<THREE.MeshStandardMaterial>();
+    const flashMats = new Set<THREE.MeshToonMaterial>();
     model.group.traverse((o) => {
       const m = (o as THREE.Mesh).material;
-      if (m instanceof THREE.MeshStandardMaterial && m.emissiveIntensity < 1) flashMats.add(m);
+      if (m instanceof THREE.MeshToonMaterial && m.emissiveIntensity < 1) flashMats.add(m);
     });
     const flash = [...flashMats].map((mat) => ({ mat, base: mat.emissive.clone(), baseIntensity: mat.emissiveIntensity }));
     views.set(enemy.id, { model, shadow, stunStars, element: enemy.element, flashMats: flash, hp: enemy.hp, hitT: 0, stepT: 0, state: enemy.state, last: { ...enemy, pos: { ...enemy.pos } }, spawnT: t });

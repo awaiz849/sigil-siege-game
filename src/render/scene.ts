@@ -14,6 +14,7 @@ import { createParticles } from './particles.ts';
 import { ELEMENT_COLOR, PALETTE } from './palette.ts';
 import { radialTexture } from './environment.ts';
 import { createWizard } from './wizard.ts';
+import { InkOutlinePass } from './toon.ts';
 
 /** A spell orb flying from where the sigil was drawn to its target. */
 type Shot = { sprite: THREE.Sprite; from: THREE.Vector3; to: THREE.Vector3; t: number; color: number; onArrive: () => void };
@@ -64,9 +65,14 @@ export function createScene(canvas: HTMLCanvasElement) {
 
   // Bloom makes emissive things (eyes, orbs, torches, moon) glow.
   // Multisampled render target: without it the post-processing path loses anti-aliasing (jagged edges).
+  // The depth texture lets the ink pass find silhouettes.
   const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: CONFIG.MSAA_SAMPLES });
+  target.depthTexture = new THREE.DepthTexture(1, 1);
   const composer = new EffectComposer(renderer, target);
   composer.addPass(new RenderPass(scene, camera));
+  const ink = new InkOutlinePass(camera);
+  ink.enabled = CONFIG.INK.enabled;
+  composer.addPass(ink);
   const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), CONFIG.BLOOM.strength, CONFIG.BLOOM.radius, CONFIG.BLOOM.threshold);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
@@ -196,8 +202,9 @@ export function createScene(canvas: HTMLCanvasElement) {
     camera.lookAt(lookAt);
 
     autoQuality(dt);
-    if (CONFIG.BLOOM.enabled && quality < 1) composer.render(dt);
-    else renderer.render(scene, camera);
+    // Post-processing chain: render -> ink outlines -> bloom (dropped first when FPS is low) -> output.
+    bloom.enabled = CONFIG.BLOOM.enabled && quality < 1;
+    composer.render(dt);
   }
 
   /** World point -> overlay pixels, or null if it is behind the camera. */

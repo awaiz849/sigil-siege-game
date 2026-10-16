@@ -2,6 +2,8 @@
 // rocks, the castle wall we stand on, torches, and drifting fireflies.
 // Everything is built from three.js primitives (no downloaded assets).
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { toon } from './toon.ts';
 import { CONFIG } from '../config.ts';
 import { PALETTE } from './palette.ts';
 import { createLandmarks } from './landmarks.ts';
@@ -207,7 +209,7 @@ function createGround(): THREE.Mesh {
   geo.computeVertexNormals();
   const mesh = new THREE.Mesh(
     geo,
-    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, flatShading: true }),
+    toon({ vertexColors: true, roughness: 1, flatShading: true }),
   );
   mesh.receiveShadow = CONFIG.SHADOWS;
   return mesh;
@@ -219,9 +221,9 @@ function createForest(): THREE.Group {
   const count = 260;
   const trunkGeo = new THREE.CylinderGeometry(0.15, 0.22, 1.2, 5);
   const crownGeo = new THREE.ConeGeometry(1.2, 3.2, 6);
-  const trunk = new THREE.InstancedMesh(trunkGeo, new THREE.MeshStandardMaterial({ color: PALETTE.wood, flatShading: true }), count);
-  const crownA = new THREE.InstancedMesh(crownGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true }), count);
-  const crownB = new THREE.InstancedMesh(crownGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true }), count);
+  const trunk = new THREE.InstancedMesh(trunkGeo, toon({ color: PALETTE.wood, flatShading: true }), count);
+  const crownA = new THREE.InstancedMesh(crownGeo, toon({ color: 0xffffff, flatShading: true }), count);
+  const crownB = new THREE.InstancedMesh(crownGeo, toon({ color: 0xffffff, flatShading: true }), count);
   const m = new THREE.Matrix4();
   const q = new THREE.Quaternion();
   const col = new THREE.Color();
@@ -252,8 +254,8 @@ function createForest(): THREE.Group {
 function createRocks(): THREE.InstancedMesh {
   const count = 70;
   const rocks = new THREE.InstancedMesh(
-    new THREE.DodecahedronGeometry(0.6, 0),
-    new THREE.MeshStandardMaterial({ color: PALETTE.stoneDark, flatShading: true, roughness: 1 }),
+    new THREE.DodecahedronGeometry(0.6, 1),
+    toon({ color: PALETTE.stoneDark, flatShading: true, roughness: 1 }),
     count,
   );
   const m = new THREE.Matrix4();
@@ -286,23 +288,23 @@ function createWall() {
     const map = bricks.clone();
     map.repeat.set(rx, ry);
     map.needsUpdate = true;
-    return new THREE.MeshStandardMaterial({ map, color: new THREE.Color(PALETTE.stone).multiplyScalar(tint), roughness: 0.95 });
+    return toon({ map, color: new THREE.Color(PALETTE.stone).multiplyScalar(tint), roughness: 0.95 });
   };
 
   // Wall body: long, runs left-right; its top is the walkway.
-  const body = new THREE.Mesh(new THREE.BoxGeometry(120, top, 4), brickMat(70, 4, 0.7));
+  const body = new THREE.Mesh(new THREE.BoxGeometry(120, top, 4), brickMat(45, 3, 0.7));
   body.position.set(0, top / 2, wallZ + 2);
   g.add(body);
 
   // Low parapet along the front edge: a thin band at the bottom of the screen.
   const parapetH = 0.55;
   const gap = CONFIG.CAMERA.crenelHalfWidth; // we look out through the crenel between two merlons
-  const parapet = new THREE.Mesh(new THREE.BoxGeometry(60, parapetH, 0.8), brickMat(48, 1));
+  const parapet = new THREE.Mesh(new THREE.BoxGeometry(60, parapetH, 0.8), brickMat(30, 0.8));
   parapet.position.set(0, top + parapetH / 2, wallZ + 0.4);
   g.add(parapet);
   // Cap stones on top of the parapet, slightly uneven.
-  const capGeo = new THREE.BoxGeometry(1, 1, 1);
-  const caps = new THREE.InstancedMesh(capGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, flatShading: true, roughness: 0.9 }), 100);
+  const capGeo = new RoundedBoxGeometry(1, 1, 1, 3, 0.12);
+  const caps = new THREE.InstancedMesh(capGeo, toon({ color: 0xffffff, flatShading: true, roughness: 0.9 }), 100);
   const m = new THREE.Matrix4();
   const col = new THREE.Color();
   for (let i = 0; i < 100; i++) {
@@ -319,11 +321,11 @@ function createWall() {
 
   // Merlons (the tall teeth) at the screen edges: they frame the view without hiding the road.
   for (const x of [-(gap + 0.65), gap + 0.65, -(gap + 2.95), gap + 2.95, -(gap + 5.25), gap + 5.25]) {
-    const merlon = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1.15, 0.8), brickMat(1.2, 1.3, 0.95));
+    const merlon = new THREE.Mesh(new RoundedBoxGeometry(1.3, 1.15, 0.8, 3, 0.08), brickMat(1.2, 1.3, 0.95));
     merlon.position.set(x, top + parapetH + 0.575, wallZ + 0.4);
     merlon.rotation.y = range(-0.02, 0.02);
     g.add(merlon);
-    const cap = new THREE.Mesh(new THREE.BoxGeometry(1.42, 0.14, 0.92), new THREE.MeshStandardMaterial({ color: PALETTE.stone, flatShading: true }));
+    const cap = new THREE.Mesh(new RoundedBoxGeometry(1.42, 0.16, 0.92, 3, 0.06), toon({ color: PALETTE.stone, flatShading: true }));
     cap.position.set(x, top + parapetH + 1.15 + 0.07, wallZ + 0.4);
     g.add(cap);
   }
@@ -342,40 +344,67 @@ function createWall() {
 
 /** Procedural brick texture: offset rows, dark mortar, per-brick shade, a few cracks. */
 export function brickTexture(): THREE.CanvasTexture {
-  const w = 256;
-  const h = 128;
+  // Hand-drawn castle stonework (comic style): rows of irregular rounded stones with a dark ink
+  // outline and a soft highlight, instead of a uniform brick grid. Tiles seamlessly left-right.
+  const w = 512;
+  const h = 256;
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext('2d')!;
-  ctx.fillStyle = '#2a2633'; // mortar
+  ctx.fillStyle = '#1e1b28'; // mortar / ink
   ctx.fillRect(0, 0, w, h);
   const rows = 4;
   const rowH = h / rows;
-  const brickW = w / 4;
   for (let r = 0; r < rows; r++) {
-    const offset = r % 2 === 0 ? 0 : brickW / 2;
-    for (let c = -1; c < 5; c++) {
-      const x = c * brickW + offset;
-      const shade = 150 + Math.floor(rand() * 60);
-      ctx.fillStyle = `rgb(${shade}, ${shade - 4}, ${shade + 12})`;
-      ctx.fillRect(x + 3, r * rowH + 3, brickW - 6, rowH - 6);
-      // Lighter top edge, darker bottom edge: fake bevel.
-      ctx.fillStyle = 'rgba(255,255,255,0.12)';
-      ctx.fillRect(x + 3, r * rowH + 3, brickW - 6, 3);
-      ctx.fillStyle = 'rgba(0,0,0,0.18)';
-      ctx.fillRect(x + 3, r * rowH + rowH - 6, brickW - 6, 3);
+    let x = -rand() * 60;
+    const y = r * rowH;
+    while (x < w) {
+      const sw = 70 + rand() * 80; // stone width varies
+      const shade = 140 + Math.floor(rand() * 55);
+      // Draw each stone twice when it crosses the right edge, so the texture tiles.
+      for (const dx of x + sw > w ? [0, -w] : [0]) {
+        const sx = x + dx + 4;
+        const sy = y + 4 + rand() * 3;
+        const ww = sw - 8;
+        const hh = rowH - 9;
+        ctx.beginPath();
+        ctx.roundRect(sx, sy, ww, hh, 12);
+        ctx.fillStyle = `rgb(${shade}, ${shade - 6}, ${shade + 14})`;
+        ctx.fill();
+        // Highlight on the upper half, shadow on the lower edge: rounded, chunky stones.
+        const grad = ctx.createLinearGradient(0, sy, 0, sy + hh);
+        grad.addColorStop(0, 'rgba(255,255,255,0.18)');
+        grad.addColorStop(0.45, 'rgba(255,255,255,0)');
+        grad.addColorStop(1, 'rgba(0,0,0,0.28)');
+        ctx.fillStyle = grad;
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#141120';
+        ctx.stroke();
+      }
+      x += sw;
     }
   }
-  // Speckle for a weathered look.
-  for (let i = 0; i < 900; i++) {
-    ctx.fillStyle = rand() < 0.5 ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.06)';
-    ctx.fillRect(rand() * w, rand() * h, 2, 2);
+  // A few cracks and chips.
+  ctx.strokeStyle = 'rgba(20,17,32,0.7)';
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 10; i++) {
+    let cx = rand() * w;
+    let cy = rand() * h;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    for (let k = 0; k < 3; k++) {
+      cx += (rand() - 0.5) * 24;
+      cy += rand() * 14;
+      ctx.lineTo(cx, cy);
+    }
+    ctx.stroke();
   }
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.anisotropy = 4;
+  tex.anisotropy = 8;
   return tex;
 }
 
@@ -388,12 +417,12 @@ function createTorch(x: number, y: number, z: number) {
   g.scale.setScalar(0.42);
   const pole = new THREE.Mesh(
     new THREE.CylinderGeometry(0.06, 0.08, 0.9, 6),
-    new THREE.MeshStandardMaterial({ color: PALETTE.wood }),
+    toon({ color: PALETTE.wood }),
   );
   pole.position.y = -0.2;
   const bowl = new THREE.Mesh(
     new THREE.CylinderGeometry(0.22, 0.12, 0.22, 8),
-    new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.6, roughness: 0.5 }),
+    toon({ color: 0x2a2a2a, metalness: 0.6, roughness: 0.5 }),
   );
   bowl.position.y = 0.3;
   // No real light here (point lights are expensive on laptop GPUs): the flame sprites + bloom sell it.

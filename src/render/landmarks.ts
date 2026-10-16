@@ -2,6 +2,8 @@
 // the red rift at the end of the road the monsters pour out of, a roadside graveyard with
 // dead trees, and clouds drifting past the moon. Primitives only.
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { toon } from './toon.ts';
 import { CONFIG } from '../config.ts';
 import { brickTexture, radialTexture, WALL_TOP } from './environment.ts';
 import { PALETTE } from './palette.ts';
@@ -34,9 +36,9 @@ function createTower(side: number): Piece {
   g.position.set(x, 0, z);
 
   const map = brickTexture().clone();
-  map.repeat.set(6, 5);
+  map.repeat.set(4, 3);
   map.needsUpdate = true;
-  const stone = new THREE.MeshStandardMaterial({ map, color: 0x9a96aa, roughness: 0.95 });
+  const stone = toon({ map, color: 0x9a96aa, roughness: 0.95 });
   const height = WALL_TOP + 2.2;
   const radius = 1.9;
 
@@ -50,7 +52,7 @@ function createTower(side: number): Piece {
   g.add(ring);
   for (let i = 0; i < 10; i++) {
     const a = (i / 10) * Math.PI * 2;
-    const m = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.45), stone);
+    const m = new THREE.Mesh(new RoundedBoxGeometry(0.6, 0.6, 0.45, 3, 0.07), stone);
     m.position.set(Math.cos(a) * (radius + 0.1), height + 0.8, Math.sin(a) * (radius + 0.1));
     m.rotation.y = -a;
     g.add(m);
@@ -59,19 +61,19 @@ function createTower(side: number): Piece {
   // Conical roof (navy slate) with a gold finial.
   const roof = new THREE.Mesh(
     new THREE.ConeGeometry(radius + 0.5, 3.4, 14),
-    new THREE.MeshStandardMaterial({ color: 0x2a2458, flatShading: true, roughness: 0.7 }),
+    toon({ color: 0x2a2458, flatShading: true, roughness: 0.7 }),
   );
   roof.position.y = height + 0.5 + 1.7;
   g.add(roof);
   const finial = new THREE.Mesh(
     new THREE.SphereGeometry(0.18, 8, 6),
-    new THREE.MeshStandardMaterial({ color: PALETTE.gold, metalness: 0.8, roughness: 0.3, emissive: PALETTE.gold, emissiveIntensity: 0.4 }),
+    toon({ color: PALETTE.gold, metalness: 0.8, roughness: 0.3, emissive: PALETTE.gold, emissiveIntensity: 0.4 }),
   );
   finial.position.y = height + 3.9;
   g.add(finial);
 
   // Warm glowing windows facing the camera side and the field.
-  const windowMat = new THREE.MeshStandardMaterial({ color: 0xffb35c, emissive: 0xff9a3c, emissiveIntensity: 1.2 });
+  const windowMat = toon({ color: 0xffb35c, emissive: 0xff9a3c, emissiveIntensity: 1.2 });
   const windows: THREE.Mesh[] = [];
   for (const [wy, wa] of [
     [2.6, Math.PI * 0.5],
@@ -91,13 +93,13 @@ function createTower(side: number): Piece {
   bannerGeo.translate(0, -1.15, 0);
   const banner = new THREE.Mesh(
     bannerGeo,
-    new THREE.MeshStandardMaterial({ color: 0x7a35c0, side: THREE.DoubleSide, flatShading: true, emissive: 0x2a0a50, emissiveIntensity: 0.5 }),
+    toon({ color: 0x7a35c0, side: THREE.DoubleSide, flatShading: true, emissive: 0x2a0a50, emissiveIntensity: 0.5 }),
   );
   // Facing the field-and-camera diagonal, on the inner side of the tower.
   banner.position.set(-side * (radius + 0.05), height - 0.3, 0.6);
   banner.rotation.y = -side * 0.9;
   g.add(banner);
-  const stripe = new THREE.Mesh(new THREE.PlaneGeometry(0.92, 0.14), new THREE.MeshStandardMaterial({ color: PALETTE.gold, side: THREE.DoubleSide, emissive: PALETTE.gold, emissiveIntensity: 0.3 }));
+  const stripe = new THREE.Mesh(new THREE.PlaneGeometry(0.92, 0.14), toon({ color: PALETTE.gold, side: THREE.DoubleSide, emissive: PALETTE.gold, emissiveIntensity: 0.3 }));
   stripe.position.set(0, -0.35, 0.01);
   banner.add(stripe);
   const pos = bannerGeo.attributes.position as THREE.BufferAttribute;
@@ -127,7 +129,7 @@ function createRift(): Piece {
   g.position.set(0, 4.2 * CONFIG.LANDMARKS.riftScale + 0.6, CONFIG.FIELD.spawnZ - 6);
   g.scale.setScalar(CONFIG.LANDMARKS.riftScale);
 
-  const ringMat = new THREE.MeshStandardMaterial({ color: 0xff3048, emissive: 0xff2040, emissiveIntensity: 3 });
+  const ringMat = toon({ color: 0xff3048, emissive: 0xff2040, emissiveIntensity: 3 });
   const ring = new THREE.Mesh(new THREE.TorusGeometry(3.6, 0.18, 8, 48), ringMat);
   ring.scale.set(1, 1.15, 1);
   g.add(ring);
@@ -178,8 +180,8 @@ function createRift(): Piece {
 
 function createGraveyard(): Piece {
   const g = new THREE.Group();
-  const stone = new THREE.MeshStandardMaterial({ color: 0x6b6880, flatShading: true, roughness: 1 });
-  const wood = new THREE.MeshStandardMaterial({ color: 0x2c2420, flatShading: true, roughness: 1 });
+  const stone = toon({ color: 0x6b6880, flatShading: true, roughness: 1 });
+  const wood = toon({ color: 0x2c2420, flatShading: true, roughness: 1 });
   const half = CONFIG.FIELD.halfWidth;
 
   // Gravestones in loose rows on both roadsides, leaning a little.
@@ -188,7 +190,7 @@ function createGraveyard(): Piece {
     const x = side * range(half + 2, half + 7);
     const z = range(-45, -10);
     const h = range(0.7, 1.2);
-    const stoneMesh = new THREE.Mesh(new THREE.BoxGeometry(0.6, h, 0.18), stone);
+    const stoneMesh = new THREE.Mesh(new RoundedBoxGeometry(0.6, h, 0.18, 3, 0.05), stone);
     stoneMesh.position.set(x, h / 2 - 0.05, z);
     stoneMesh.rotation.set(range(-0.15, 0.15), range(-0.4, 0.4), range(-0.15, 0.15));
     const top = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.18, 10, 1, false, 0, Math.PI), stone);

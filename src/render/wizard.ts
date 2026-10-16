@@ -3,6 +3,7 @@
 // He reacts to the hand pose: idle sway, right arm raised while drawing, both arms thrust
 // forward when a spell is cast, arms spread with a cyan glow for the shield.
 import * as THREE from 'three';
+import { toon } from './toon.ts';
 import { onCursor, type Pose } from '../events.ts';
 import { PALETTE } from './palette.ts';
 import { radialTexture } from './environment.ts';
@@ -16,11 +17,11 @@ export function createWizard() {
   const body = new THREE.Group(); // sways while idle
   root.add(body);
 
-  const robe = new THREE.MeshStandardMaterial({ color: ROBE, flatShading: true, roughness: 0.8 });
-  const robeDark = new THREE.MeshStandardMaterial({ color: ROBE_DARK, flatShading: true, roughness: 0.9, side: THREE.DoubleSide });
-  const gold = new THREE.MeshStandardMaterial({ color: PALETTE.gold, metalness: 0.7, roughness: 0.35, emissive: PALETTE.gold, emissiveIntensity: 0.15 });
-  const skin = new THREE.MeshStandardMaterial({ color: SKIN, flatShading: true });
-  const orbMat = new THREE.MeshStandardMaterial({ color: PALETTE.gold, emissive: PALETTE.gold, emissiveIntensity: 3 });
+  const robe = toon({ color: ROBE, flatShading: true, roughness: 0.8 });
+  const robeDark = toon({ color: ROBE_DARK, flatShading: true, roughness: 0.9, side: THREE.DoubleSide });
+  const gold = toon({ color: PALETTE.gold, metalness: 0.7, roughness: 0.35, emissive: PALETTE.gold, emissiveIntensity: 0.15 });
+  const skin = toon({ color: SKIN, flatShading: true });
+  const orbMat = toon({ color: PALETTE.gold, emissive: PALETTE.gold, emissiveIntensity: 3 });
 
   // Robe: flared skirt + torso, gold hem and belt.
   const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.62, 1.0, 10), robe);
@@ -59,7 +60,7 @@ export function createWizard() {
   const head = new THREE.Group();
   head.position.y = 1.85;
   const face = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), skin);
-  const beard = new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.4, 8), new THREE.MeshStandardMaterial({ color: 0xeeeeee, flatShading: true }));
+  const beard = new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.4, 8), toon({ color: 0xeeeeee, flatShading: true }));
   beard.rotation.x = Math.PI;
   beard.position.set(0, -0.2, -0.12);
   const hood = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.62), robe);
