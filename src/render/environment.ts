@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config.ts';
 import { PALETTE } from './palette.ts';
+import { createLandmarks } from './landmarks.ts';
 
 /** Small seeded random so the scenery looks the same every time. */
 function makeRandom(seed: number) {
@@ -41,6 +42,8 @@ export function createEnvironment(scene: THREE.Scene) {
   const mist = createMist();
   mist.sprites.forEach((m) => scene.add(m));
   updaters.push(mist.update);
+  const landmarks = createLandmarks(scene);
+  updaters.push(landmarks.update);
   const fireflies = createFireflies();
   scene.add(fireflies.points);
   updaters.push(fireflies.update);
@@ -338,7 +341,7 @@ function createWall() {
 }
 
 /** Procedural brick texture: offset rows, dark mortar, per-brick shade, a few cracks. */
-function brickTexture(): THREE.CanvasTexture {
+export function brickTexture(): THREE.CanvasTexture {
   const w = 256;
   const h = 128;
   const canvas = document.createElement('canvas');

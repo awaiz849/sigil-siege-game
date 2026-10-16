@@ -144,6 +144,9 @@ export const CONFIG = {
   BLOOM: { enabled: true, strength: 0.9, radius: 0.55, threshold: 0.8 },
   /** Night look: sky fill light, moonlight, fog density. Raise ambient/moon if the demo screen is too dark. */
   NIGHT: { ambient: 1.1, moon: 2.2, fog: 0.017 },
+  /** Castle towers: sideways distance from the centre and how far they stick out from the wall
+   *  (they frame the screen edges). riftScale = size of the monster rift at the end of the road. */
+  LANDMARKS: { towerX: 10, towerForward: 4.5, riftScale: 0.7 },
   /** Third-person camera behind and above the wizard (CoC-style).
    *  height / back = camera position above the walkway and behind the wall's front face;
    *  x = sideways offset (over the shoulder). wizardX/wizardBack = where the wizard stands. */

@@ -9,6 +9,9 @@
       /* 3D canvas at the bottom, 2D overlay (HUD, trail, menus) on top */
       canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
       #overlay { pointer-events: none; }
+      /* Cinematic vignette between the 3D scene and the HUD: darkens the screen edges. */
+      #vignette { position: fixed; inset: 0; pointer-events: none;
+        background: radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 55%, rgba(3,2,12,0.55) 100%); }
     </style>
   </head>
   <body>

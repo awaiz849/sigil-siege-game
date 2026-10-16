@@ -54,6 +54,7 @@ export function createScene(canvas: HTMLCanvasElement) {
   wizard.group.position.set(CONFIG.CAMERA.wizardX, WALL_TOP, CONFIG.FIELD.wallZ + CONFIG.CAMERA.wizardBack);
   scene.add(wizard.group);
   let lightningT = 0;
+  let sparkT = 0;
   const particles = createParticles(scene);
   const enemies = createEnemyView(scene, particles);
 
@@ -106,6 +107,12 @@ export function createScene(canvas: HTMLCanvasElement) {
     time += dt;
     environment.update(time, dt);
     wizard.update(time, dt);
+    // A trickle of golden sparks from the wizard's orb.
+    sparkT += dt;
+    if (sparkT > 0.06) {
+      sparkT = 0;
+      particles.burst(wizard.orbWorldPosition(new THREE.Vector3()), PALETTE.gold, 1, 0.6, 0.8, 0.6);
+    }
     // Lightning flash: the whole scene lights up for a moment.
     lightningT = Math.max(0, lightningT - dt * 4);
     sky.intensity = CONFIG.NIGHT.ambient + lightningT * 6;

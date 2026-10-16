@@ -21,7 +21,9 @@ import { formatRoundLog, noteStrokeStart } from './game/roundLog.ts';
 const glCanvas = document.createElement('canvas');
 const overlayCanvas = document.createElement('canvas');
 overlayCanvas.id = 'overlay';
-document.body.append(glCanvas, overlayCanvas);
+const vignette = document.createElement('div');
+vignette.id = 'vignette';
+document.body.append(glCanvas, vignette, overlayCanvas);
 
 const world3d = createScene(glCanvas);
 const overlay = createOverlay(overlayCanvas);
