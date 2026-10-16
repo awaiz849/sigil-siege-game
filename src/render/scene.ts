@@ -7,7 +7,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { CONFIG } from '../config.ts';
-import type { Enemy, World } from '../game/types.ts';
+import type { Enemy, Hero, World } from '../game/types.ts';
 import { createEnvironment, WALL_TOP } from './environment.ts';
 import { createEnemyView } from './enemyView.ts';
 import { createParticles } from './particles.ts';
@@ -328,6 +328,11 @@ export function createScene(canvas: HTMLCanvasElement) {
     /** The wizard casts: arms thrust forward, orb flashes in the spell colour. */
     wizardCast(color: number) {
       wizard.cast(color);
+    },
+    /** Which hero stands on the wall (level 1 wizard, level 2 Grand Warden). */
+    setHero(hero: Hero) {
+      wizard.setHero(hero);
+      ending.setHero(hero);
     },
     /** The element being drawn (live recognition): the wizard's orb glows in it. */
     wizardElement(color: number | null) {

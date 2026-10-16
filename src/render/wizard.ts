@@ -11,7 +11,9 @@ import { toon } from './toon.ts';
 import { onCursor, type Pose } from '../events.ts';
 import { PALETTE } from './palette.ts';
 import { radialTexture } from './environment.ts';
-import { whenGlbLoaded } from './glbModels.ts';
+import { staffSwing, whenGlbLoaded } from './glbModels.ts';
+import { CONFIG } from '../config.ts';
+import type { Hero } from '../game/types.ts';
 
 const ROBE = 0x8a45d0;
 const ROBE_DARK = 0x55288a;
@@ -23,12 +25,26 @@ export function createWizard() {
   root.add(body);
   const figure = new THREE.Group(); // the primitive wizard (hidden when the GLB model loads)
   body.add(figure);
-  const glbFigure = new THREE.Group(); // the GLB wizard, leans into casts
+  const glbFigure = new THREE.Group(); // the GLB hero (wizard or Grand Warden), leans into casts
   body.add(glbFigure);
-  whenGlbLoaded('wizard', (model) => {
-    figure.visible = false;
-    glbFigure.add(model);
-  });
+  // Both heroes stand on the same rig (orb, light, rune circle); setHero() shows one of them.
+  let hero: Hero = 'wizard';
+  const models: Partial<Record<Hero, THREE.Object3D>> = {};
+  let staff: { set(angle: number): void } | null = null;
+  function showHero() {
+    for (const [k, m] of Object.entries(models)) m.visible = k === hero;
+    figure.visible = !models[hero]; // primitive wizard only while no model is loaded
+  }
+  for (const key of ['wizard', 'warden'] as const) {
+    whenGlbLoaded(key, (model) => {
+      models[key] = model;
+      glbFigure.add(model);
+      const staffCfg = CONFIG.GLB_MODELS[key].staff;
+      if (staffCfg) staff = staffSwing(model, staffCfg);
+      showHero();
+    });
+  }
+  let swingT = 1; // 0..1 through the staff swing after a cast (1 = at rest)
 
   const robe = toon({ color: ROBE, flatShading: true, roughness: 0.8 });
   const robeDark = toon({ color: ROBE_DARK, flatShading: true, roughness: 0.9, side: THREE.DoubleSide });
@@ -149,6 +165,9 @@ export function createWizard() {
     /** Animate. t = seconds. */
     update(t: number, dt: number) {
       castT = Math.max(0, castT - dt * 3);
+      // The Grand Warden waves his staff: wind up back, slash forward, settle (about half a second).
+      swingT = Math.min(1, swingT + dt * 2);
+      if (staff) staff.set(hero === 'warden' ? staffAngle(swingT) : 0);
       body.position.y = Math.sin(t * 2) * 0.03;
       body.rotation.z = Math.sin(t * 1.3) * 0.02;
       // Turn toward where the hand points (facing -z: a negative turn looks right).
@@ -224,12 +243,19 @@ export function createWizard() {
     /** A spell was cast: arms thrust, orb flashes in the spell colour (and keeps glowing in it). */
     cast(color: number) {
       castT = 1;
+      swingT = 0;
       element = (element ?? new THREE.Color()).set(color);
       runeMat.color.set(color);
       orbMat.color.set(color);
       orbMat.emissive.set(color);
       (orbGlow.material as THREE.SpriteMaterial).color.set(color);
       light.color.set(color);
+    },
+
+    /** Which hero stands on the wall (level 1 wizard, level 2 Grand Warden). */
+    setHero(next: Hero) {
+      hero = next;
+      showHero();
     },
 
     /** World position spells fly from (the orb). */
@@ -240,6 +266,14 @@ export function createWizard() {
 }
 
 export type Wizard = ReturnType<typeof createWizard>;
+
+/** Staff swing over one cast (s = 0..1): wind up back, slash forward toward the field, settle. */
+function staffAngle(s: number): number {
+  const ease = (x: number) => 0.5 - 0.5 * Math.cos(Math.PI * Math.min(1, Math.max(0, x)));
+  if (s < 0.3) return -0.7 * ease(s / 0.3);
+  if (s < 0.6) return -0.7 + 1.6 * ease((s - 0.3) / 0.3);
+  return 0.9 * (1 - ease((s - 0.6) / 0.4));
+}
 
 /** Magic circle drawn on a canvas: two rings, tick marks, small rune glyphs and a star. */
 function runeTexture(): THREE.CanvasTexture {

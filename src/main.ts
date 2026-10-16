@@ -17,9 +17,9 @@ import { createHandInput, type HandInput } from './input/handInput.ts';
 import { onPalm, onStrokeEnd, onStrokePoint, onStrokeStart } from './events.ts';
 import { classify } from './recognizer/index.ts';
 import { createRecorder } from './recognizer/recorder.ts';
-import type { GameEvent, World } from './game/types.ts';
+import type { GameEvent, Hero, World } from './game/types.ts';
 import { createWorld, startRound, takeEvents, update } from './game/world.ts';
-import { castShield, castSpell, type SpellResult } from './game/spells.ts';
+import { castShield, castSpell, HERO_SPELLS, type SpellResult } from './game/spells.ts';
 import { formatRoundLog, noteStrokeStart } from './game/roundLog.ts';
 
 const glCanvas = document.createElement('canvas');
@@ -94,8 +94,9 @@ window.addEventListener('keydown', (e) => {
 });
 
 /** Start a fresh round (from the title or end screen). */
-function newRound(difficulty: Difficulty) {
-  world = startRound(createWorld(difficulty));
+function newRound(difficulty: Difficulty, hero: Hero = world.hero) {
+  world = startRound(createWorld(difficulty, Date.now(), hero));
+  world3d.setHero(hero);
 }
 
 // Dev only (npm run dev): window.sigil.world() in the browser console gives the live World,
@@ -108,18 +109,27 @@ const screens = createScreens({
   mouseMode: () => mouse.isEnabled(),
   camera: () => camera,
   onStart: newRound,
+  onHero: (hero) => {
+    world = createWorld(world.difficulty, Date.now(), hero); // still in the menu
+    world3d.setHero(hero);
+  },
   playing: () => world.phase === 'PLAYING',
   onRestart: () => newRound(world.difficulty),
   // Leave the round: an empty world in the menu (the 3D scene clears its monsters).
   onExit: () => {
-    world = createWorld(world.difficulty);
+    world = createWorld(world.difficulty, Date.now(), world.hero);
     setMusicIntensity(0);
   },
 });
 
 // ---- Casting: stroke -> recognizer -> spell on the enemy nearest the stroke centre ----
 const view = { project: world3d.project, projectPoint: world3d.projectPoint };
-const SPELL_COLOR: Record<string, number> = { water: 0x3fa9ff, fire: 0xff5a2e, nature: 0x6fe05a, lightning: 0xcfe6ff };
+const SPELL_COLOR: Record<string, number> = {
+  water: 0x3fa9ff, fire: 0xff5a2e, nature: 0x6fe05a, lightning: 0xcfe6ff,
+  frost: 0x9fe0ff, flame: 0xff6a2a, thorn: 0x6fe05a, arcane: 0xc9a0ff,
+};
+/** The Grand Warden's spells reuse the matching element's impact, trail particles and sounds. */
+const LOOKS_LIKE: Record<string, string> = { frost: 'water', flame: 'fire', thorn: 'nature', arcane: 'lightning', timewarp: 'wind', tome: 'shield' };
 
 // Pen down: start the pen-down -> cast timer for the tuning log.
 onStrokeStart(() => noteStrokeStart(world));
@@ -127,7 +137,6 @@ onStrokeStart(() => noteStrokeStart(world));
 // Live recognition while drawing: a few times a second the half-drawn stroke is classified;
 // once it is clearly a shape, the trail takes on that element (colour + particles) and the
 // wizard's orb glows in it.
-const SHAPE_SPELL: Record<string, string> = { C: 'water', L: 'fire', v: 'nature', zigzag: 'lightning', line: 'wind' };
 let livePoints: Array<{ x: number; y: number }> = [];
 let liveAt = 0;
 onStrokeStart(() => {
@@ -139,16 +148,16 @@ onStrokePoint((x, y) => {
   const now = performance.now();
   if (livePoints.length < CONFIG.LIVE_SHAPE.minPoints || now - liveAt < CONFIG.LIVE_SHAPE.everyMs) return;
   liveAt = now;
-  const guess = classify(livePoints);
-  const spell = guess.name && guess.score >= CONFIG.LIVE_SHAPE.minScore ? SHAPE_SPELL[guess.name] : null;
-  overlay.trail.setSpell(spell);
+  const guess = classify(livePoints, world.hero);
+  const spell = guess.name && guess.score >= CONFIG.LIVE_SHAPE.minScore ? HERO_SPELLS[world.hero][guess.name] ?? null : null;
+  overlay.trail.setSpell(spell ? LOOKS_LIKE[spell] ?? spell : null);
   if (spell) world3d.wizardElement(SPELL_COLOR[spell] ?? null);
 });
 
 // Every finished stroke: recorder first (if armed), otherwise recognize it and cast.
 onStrokeEnd((points) => {
   if (recorder.consume(points)) return;
-  const shape = classify(points);
+  const shape = classify(points, world.hero);
   const centre = overlay.worldUi.strokeCentre(points)!;
   if (debugOverlay.isVisible()) overlay.showDebugLabel(`${shape.name ?? 'no match'} ${shape.score.toFixed(2)}`, centre.x, centre.y);
   if (screens.current === 'tutorial') return screens.tutorialStroke(shape.name); // practice the shapes
@@ -177,7 +186,7 @@ function showCast(result: SpellResult, from?: { x: number; y: number }) {
   const color = result.spell ? SPELL_COLOR[result.spell] : undefined;
   if (color !== undefined) {
     for (const hit of result.hits) {
-      const burst = () => world3d.impact(result.spell!, hit.pos, hit.enemyId, hit.effect === 'strong');
+      const burst = () => world3d.impact(LOOKS_LIKE[result.spell!] ?? result.spell!, hit.pos, hit.enemyId, hit.effect === 'strong');
       // Element spells fly as an orb from the sigil to the target; lightning strikes at once.
       if (from && result.spell !== 'lightning') world3d.castProjectile(hit.pos, hit.enemyId, color, burst);
       else burst();

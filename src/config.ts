@@ -9,6 +9,7 @@ export type GlbModelConfig = {
   rotationY: number;
   tint: 'hue' | 'glow' | 'none';
   legs?: { hip: number; frontZ: number; backZ: number; legR: number; legX: number; swing: number; strides: number };
+  staff?: { pivot: [number, number, number]; maxX: number; minZ: number; topY: number };
 };
 
 export const CONFIG = {
@@ -237,7 +238,13 @@ export const CONFIG = {
       legs: { hip: 0.22, frontZ: 0.15, backZ: -0.12, legR: 0.075, legX: 0.125, swing: 0.45, strides: 1.6 },
     },
     wizard: { file: 'models/wizard.glb', height: 2.3, rotationY: Math.PI, tint: 'none' },
-  } as Record<'imp' | 'bird' | 'warlock' | 'boss' | 'wizard', GlbModelConfig>,
+    // Level 2 hero. staff = the part of the mesh that swings on every attack (model units, height 1):
+    // pivot = the hand, maxX / minZ pick the staff out of the mesh, the top ornament is above topY.
+    warden: {
+      file: 'models/warden.glb', height: 2.4, rotationY: Math.PI, tint: 'none',
+      staff: { pivot: [-0.33, 0.62, 0.17], maxX: -0.28, minZ: 0.11, topY: 0.8 },
+    },
+  } as Record<'imp' | 'bird' | 'warlock' | 'boss' | 'wizard' | 'warden', GlbModelConfig>,
   /** Give GLB models toon shading so they match the comic look (false = keep their own PBR look). */
   GLB_TOON: true,
   /** 'hue' tint: degrees to turn the texture's colours per element (the textures are fire-coloured). */

@@ -9,7 +9,7 @@
 //   pause: Esc/P/Enter resumes; end: Enter plays again, Esc goes to the menu.
 import { CONFIG, type Difficulty } from '../config.ts';
 import { onCursor, type Pose } from '../events.ts';
-import type { World } from '../game/types.ts';
+import type { Hero, World } from '../game/types.ts';
 import type { HandInput } from '../input/handInput.ts';
 import { createDwell, type Rect } from '../input/dwell.ts';
 import { createPalmHold } from '../input/palmHold.ts';
@@ -26,7 +26,9 @@ type Opts = {
   hand: () => HandInput | null;
   mouseMode: () => boolean;
   camera: () => CameraState;
-  onStart: (difficulty: Difficulty) => void;
+  onStart: (difficulty: Difficulty, hero: Hero) => void;
+  /** The level / hero picked on the title changed (the 3D wall shows that hero). */
+  onHero: (hero: Hero) => void;
   /** True while a round is running (the in-game pause button is live then). */
   playing: () => boolean;
   /** Pause menu: start the same difficulty over / leave the round for the title screen. */
@@ -36,10 +38,14 @@ type Opts = {
 
 const DIFFICULTIES: Difficulty[] = ['easy', 'normal', 'hard'];
 const BEST_KEY = 'sigil-siege-best';
+/** Best scores are kept per difficulty, and separately for level 2 (the wizard keeps the old keys). */
+const bestKey = (d: Difficulty, hero: Hero) => (hero === 'wizard' ? d : `${hero}:${d}`);
 
 export function createScreens(opts: Opts) {
   let screen: ScreenName | null = 'handCheck';
   let difficulty: Difficulty = 'normal';
+  /** Level 1 = the wizard, level 2 = the Grand Warden. */
+  let hero: Hero = 'wizard';
   let endWorld: World | null = null;
   let newBest = false;
   let shownAt = performance.now();
@@ -78,6 +84,13 @@ export function createScreens(opts: Opts) {
     const s = scale();
     return { x: W - 16 * s - 150 * s, y: 84 * s, w: 150 * s, h: 44 * s };
   }
+  /** Level buttons on the title, above the difficulty row. */
+  function levelRect(i: number): Rect {
+    const s = scale();
+    const bw = 320 * s;
+    const gap = 28 * s;
+    return { x: W / 2 - bw - gap / 2 + i * (bw + gap), y: H * 0.37, w: bw, h: 58 * s };
+  }
   /** Bottom-right corner button (SKIP TUTORIAL, HOW TO PLAY). */
   function cornerRect(): Rect {
     const s = scale();
@@ -92,7 +105,7 @@ export function createScreens(opts: Opts) {
   function openTutorial(thenStart: boolean) {
     sound.select();
     startAfterTutorial = thenStart;
-    tutorial.reset();
+    tutorial.reset(hero);
     show('tutorial');
   }
   function finishTutorial() {
@@ -100,7 +113,7 @@ export function createScreens(opts: Opts) {
       startAfterTutorial = false;
       sound.start();
       screen = null;
-      opts.onStart(difficulty);
+      opts.onStart(difficulty, hero);
     } else {
       sound.select();
       show('title');
@@ -113,10 +126,16 @@ export function createScreens(opts: Opts) {
     sound.select();
   }
   function start() {
-    if (!tutorialDone()) return openTutorial(true); // first time: learn the shapes first
+    if (!tutorialDone(hero)) return openTutorial(true); // first time with this hero: learn his shapes first
     sound.start();
     screen = null;
-    opts.onStart(difficulty);
+    opts.onStart(difficulty, hero);
+  }
+  function pickHero(h: Hero) {
+    if (h === hero) return;
+    hero = h;
+    sound.select();
+    opts.onHero(h);
   }
   function pause() {
     if (screen !== null || !opts.playing()) return;
@@ -148,6 +167,9 @@ export function createScreens(opts: Opts) {
     makeButton(() => screen === 'title', () => difficultyRect(i), d.toUpperCase(), () => pickDifficulty(d)),
   );
   const startButton = makeButton(() => screen === 'title', startRect, 'START', start);
+  const levelButtons = (['wizard', 'warden'] as const).map((h, i) =>
+    makeButton(() => screen === 'title', () => levelRect(i), i === 0 ? 'LEVEL 1  WIZARD' : 'LEVEL 2  GRAND WARDEN', () => pickHero(h)),
+  );
   const pauseButtons = [
     makeButton(() => screen === 'pause', () => stackRect(0, H * 0.38), 'RESUME', resume),
     makeButton(() => screen === 'pause', () => stackRect(1, H * 0.38), 'RESTART', restart),
@@ -168,7 +190,7 @@ export function createScreens(opts: Opts) {
   ];
   // In game: a longer hover, so aiming near the corner never pauses by accident.
   const pauseGameButton = makeButton(() => screen === null && opts.playing(), pauseRect, 'II  PAUSE', pause, CONFIG.PAUSE_HOVER_S);
-  const allButtons = [...difficultyButtons, startButton, howToButton, ...tutorialButtons, ...pauseButtons, ...endButtons, pauseGameButton];
+  const allButtons = [...difficultyButtons, ...levelButtons, startButton, howToButton, ...tutorialButtons, ...pauseButtons, ...endButtons, pauseGameButton];
 
   // Mouse: a left click on a live button presses it (overlay pixels = CSS pixels).
   window.addEventListener('click', (e) => {
@@ -198,6 +220,8 @@ export function createScreens(opts: Opts) {
       if (e.key >= '1' && e.key <= '3') pickDifficulty(DIFFICULTIES[Number(e.key) - 1]);
       else if (e.key === 'ArrowLeft') pickDifficulty(DIFFICULTIES[Math.max(0, i - 1)]);
       else if (e.key === 'ArrowRight') pickDifficulty(DIFFICULTIES[Math.min(2, i + 1)]);
+      else if (e.key === 'ArrowUp') pickHero('wizard');
+      else if (e.key === 'ArrowDown') pickHero('warden');
       else if (confirm) start();
       else return;
     } else if (screen === 'pause' && (back || confirm)) resume();
@@ -232,8 +256,9 @@ export function createScreens(opts: Opts) {
   function saveBest(world: World): boolean {
     try {
       const best = JSON.parse(localStorage.getItem(BEST_KEY) ?? '{}') as Record<string, number>;
-      if (world.score > (best[world.difficulty] ?? 0)) {
-        best[world.difficulty] = world.score;
+      const key = bestKey(world.difficulty, world.hero);
+      if (world.score > (best[key] ?? 0)) {
+        best[key] = world.score;
         localStorage.setItem(BEST_KEY, JSON.stringify(best));
         return world.score > 0;
       }
@@ -245,7 +270,7 @@ export function createScreens(opts: Opts) {
 
   function bestScore(d: Difficulty): number {
     try {
-      return (JSON.parse(localStorage.getItem(BEST_KEY) ?? '{}') as Record<string, number>)[d] ?? 0;
+      return (JSON.parse(localStorage.getItem(BEST_KEY) ?? '{}') as Record<string, number>)[bestKey(d, hero)] ?? 0;
     } catch {
       return 0;
     }
@@ -420,18 +445,16 @@ export function createScreens(opts: Opts) {
     ctx.fillText('Draw sigils in the air to defend the wall.', W / 2, ly + 64 * s);
     ctx.fillText('The SHAPE picks the spell. WHERE you draw picks the target.', W / 2, ly + 90 * s);
 
-    // A row of glowing sigils that "draw themselves" in a loop.
-    const sig = [
-      { shape: 'C' as const, color: ELEMENT_CSS.water },
-      { shape: 'L' as const, color: ELEMENT_CSS.fire },
-      { shape: 'v' as const, color: ELEMENT_CSS.nature },
-      { shape: 'zigzag' as const, color: '#cfe6ff' },
-    ];
+    // Level choice: level 1 the wizard, level 2 the Grand Warden (his own shapes and spells).
+    levelButtons.forEach((b, i) => drawButton(ctx, b, hero === (i === 0 ? 'wizard' : 'warden'), s, 18));
+    // The chosen hero's four sigils, glowing in turn, under the level buttons.
+    const sig = hero === 'wizard'
+      ? [{ shape: 'C' as const, color: ELEMENT_CSS.water }, { shape: 'L' as const, color: ELEMENT_CSS.fire }, { shape: 'v' as const, color: ELEMENT_CSS.nature }, { shape: 'zigzag' as const, color: '#cfe6ff' }]
+      : [{ shape: 'U' as const, color: ELEMENT_CSS.water }, { shape: 'Z' as const, color: ELEMENT_CSS.fire }, { shape: 'peak' as const, color: ELEMENT_CSS.nature }, { shape: 'M' as const, color: '#c9a0ff' }];
     sig.forEach((g, i) => {
-      const x = W / 2 + (i - 1.5) * 90 * s;
-      const pulse = 0.55 + 0.45 * Math.sin(now / 500 - i * 0.8);
-      ctx.globalAlpha = pulse;
-      drawSigil(ctx, g.shape, x, H * 0.44, 44 * s, g.color, 4 * s);
+      const x = W / 2 + (i - 1.5) * 60 * s;
+      ctx.globalAlpha = 0.55 + 0.45 * Math.sin(now / 500 - i * 0.8);
+      drawSigil(ctx, g.shape, x, H * 0.37 + 82 * s, 28 * s, g.color, 3 * s);
       ctx.globalAlpha = 1;
     });
 

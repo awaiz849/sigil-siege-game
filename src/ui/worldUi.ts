@@ -7,7 +7,7 @@ import { onStrokeEnd, onStrokePoint, onStrokeStart, type Point } from '../events
 import { pickTarget, type SpellResult } from '../game/spells.ts';
 import type { Enemy, FloatText, GameEvent, Vec3, World } from '../game/types.ts';
 import { FONT_TITLE } from './fonts.ts';
-import { COUNTER_SIGIL, drawElementIcon, drawSigil, ELEMENT_CSS, GOLD, roundRect } from './icons.ts';
+import { COUNTER_SIGIL_BY_HERO, drawElementIcon, drawSigil, ELEMENT_CSS, GOLD, roundRect } from './icons.ts';
 
 /** What the overlay needs from the renderer. */
 export type View = {
@@ -27,6 +27,13 @@ const SPELL_CSS: Record<string, string> = {
   lightning: '#cfe6ff',
   wind: '#e8f6ff',
   shield: '#9fe6ff',
+  frost: '#9fe0ff',
+  flame: '#ff6a2a',
+  thorn: '#6fe05a',
+  arcane: '#c9a0ff',
+  timewarp: '#b8a0ff',
+  tome: '#ffd86a',
+  meteor: '#ff8a3a',
 };
 
 const TONE_COLOR: Record<FloatText['tone'], string> = {
@@ -48,6 +55,8 @@ export function createWorldUi() {
   let lightningFlashAt = -Infinity;
   let windAt = -Infinity;
   let killFlashAt = -Infinity;
+  let hero: World['hero'] = 'wizard';
+  let immune = 0;
   let lastStroke: Point[] = [];
   let burn: { points: Point[]; color: string; born: number; fizzle: boolean; perfect: boolean } | null = null;
 
@@ -104,19 +113,21 @@ export function createWorldUi() {
 
     /** Visual extras for a cast (lightning bolts, shield flash). */
     handleCast(result: SpellResult, view: View, now: number) {
-      if (result.spell === 'lightning' && result.kind !== 'cooldown' && result.hits.length > 0) {
+      if ((result.spell === 'lightning' || result.spell === 'arcane') && result.kind !== 'cooldown' && result.hits.length > 0) {
         lightningFlashAt = now;
         for (const hit of result.hits) {
           const p = view.projectPoint(hit.pos.x, hit.pos.y + 1, hit.pos.z);
           if (p) bolts.push({ points: jaggedLine({ x: p.x + (Math.random() - 0.5) * 200, y: -20 }, p), born: now });
         }
       }
-      if (result.spell === 'shield') shieldAt = now;
+      if (result.spell === 'shield' || (result.spell === 'tome' && result.kind === 'block')) shieldAt = now;
       if (result.kind === 'push') windAt = now;
       if (result.kind === 'kill') killFlashAt = now;
     },
 
     draw(ctx: CanvasRenderingContext2D, world: World, view: View, now: number) {
+      hero = world.hero;
+      immune = world.immuneT;
       const w = ctx.canvas.clientWidth;
       const h = ctx.canvas.clientHeight;
       const s = Math.max(0.7, Math.min(1.6, Math.min(w / 1280, h / 720)));
@@ -246,6 +257,12 @@ export function createWorldUi() {
       ctx.textAlign = 'center';
       ctx.fillStyle = '#9fe6ff';
       ctx.fillText('STUNNED x2', head.x, by - 8 * s);
+    } else if (e.slowT > 0 || e.burnT > 0) {
+      // Grand Warden statuses: slowed (arcane rain / time warp), burning (soul flame).
+      ctx.font = `${12 * s}px ${FONT_TITLE}`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = e.burnT > 0 ? '#ff8a4a' : '#c9a0ff';
+      ctx.fillText(e.burnT > 0 ? 'BURNING' : 'SLOWED', head.x, by - 8 * s);
     }
 
     // Boss: next element warning, blinking.
@@ -261,7 +278,7 @@ export function createWorldUi() {
     // Wave 1: faint hint of the sigil that beats this enemy.
     if (e.hint && !e.nextElement) {
       ctx.globalAlpha = 0.55;
-      drawSigil(ctx, COUNTER_SIGIL[e.element], head.x, by - 22 * s, 24 * s, '#ffffff', 2.5 * s);
+      drawSigil(ctx, COUNTER_SIGIL_BY_HERO[hero][e.element], head.x, by - 22 * s, 24 * s, '#ffffff', 2.5 * s);
       ctx.globalAlpha = 1;
     }
     ctx.restore();
@@ -394,6 +411,9 @@ export function createWorldUi() {
     // Red edge glow after a castle hit.
     const hit = (now - hitGlowAt) / (CONFIG.HIT_GLOW_S * 1000);
     if (hit < 1) edgeGlow(ctx, w, h, `rgba(255, 30, 20, ${0.55 * (1 - hit)})`);
+
+    // Eternal tome: a golden glow round the screen edge while the castle is immune.
+    if (immune > 0) edgeGlow(ctx, w, h, `rgba(255, 216, 106, ${0.35 + 0.15 * Math.sin(now / 120)})`);
 
     // Kill: a very short white flash (goes with the hit-stop in main.ts).
     const kf = (now - killFlashAt) / (CONFIG.KILL_FLASH_S * 1000);

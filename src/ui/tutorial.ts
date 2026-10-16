@@ -9,6 +9,9 @@ import { drawElementIcon, drawPalm, ELEMENT_CSS, GOLD, roundRect, type SigilShap
 import type { Element } from '../game/types.ts';
 
 const DONE_KEY = 'sigil-siege-tutorial-done';
+type Hero = 'wizard' | 'warden';
+/** Each hero has his own "seen the tutorial" flag (the wizard keeps the old key). */
+const doneKey = (hero: Hero) => (hero === 'wizard' ? DONE_KEY : `${DONE_KEY}-${hero}`);
 
 type Step = {
   shape: SigilShape | 'palm';
@@ -19,7 +22,7 @@ type Step = {
   beats?: Element;
 };
 
-const STEPS: Step[] = [
+const WIZARD_STEPS: Step[] = [
   { shape: 'C', name: 'WATER', color: ELEMENT_CSS.water, how: 'Draw a C: start top right, curve round to the left, end bottom right', what: 'Hits one monster.', beats: 'fire' },
   { shape: 'L', name: 'FIRE', color: ELEMENT_CSS.fire, how: 'Draw a backwards L: straight DOWN, then LEFT', what: 'Hits one monster.', beats: 'nature' },
   { shape: 'v', name: 'NATURE', color: ELEMENT_CSS.nature, how: 'Draw a V: down to a point, then back up', what: 'Hits one monster.', beats: 'water' },
@@ -28,9 +31,19 @@ const STEPS: Step[] = [
   { shape: 'palm', name: 'SHIELD', color: '#9fe6ff', how: 'Open your whole hand toward the camera', what: 'Blocks the skeleton archers’ arrows and stuns them.' },
 ];
 
+/** Level 2: the Grand Warden's spells (cousins of the wizard's shapes). */
+const WARDEN_STEPS: Step[] = [
+  { shape: 'U', name: 'FROST NOVA', color: ELEMENT_CSS.water, how: 'Draw a U: down, round the bottom, back up', what: 'Hits one monster and splashes the ones next to it.', beats: 'fire' },
+  { shape: 'Z', name: 'SOUL FLAME', color: ELEMENT_CSS.fire, how: 'Draw a Z: right, diagonal down-left, right again', what: 'Hits one monster, and it burns again 2 s later.', beats: 'nature' },
+  { shape: 'peak', name: 'THORN SPIRE', color: ELEMENT_CSS.nature, how: 'Draw a peak: up to a point, then back down', what: 'Hits one monster and roots it: frozen, double damage.', beats: 'water' },
+  { shape: 'M', name: 'ARCANE RAIN', color: '#c9a0ff', how: 'Draw an M: up, down, up, down', what: 'Hits EVERY monster and slows them. 10 s cooldown.' },
+  { shape: 'line', name: 'TIME WARP', color: '#b8a0ff', how: 'Draw one straight line', what: 'Every walking monster moves at half speed for 5 s.' },
+  { shape: 'palm', name: 'ETERNAL TOME', color: '#ffd86a', how: 'Open your whole hand toward the camera', what: 'The castle can’t be damaged for 3 s, and archers are blocked.' },
+];
+const STEPS_BY_HERO: Record<Hero, Step[]> = { wizard: WIZARD_STEPS, warden: WARDEN_STEPS };
+
 /** Recognizer name for each tutorial shape (the same names the game uses). */
-const SHAPE_NAME: Record<SigilShape, string> = { C: 'C', L: 'L', v: 'v', zigzag: 'zigzag', line: 'line' };
-const SPELL_OF: Record<string, string> = { C: 'WATER', L: 'FIRE', v: 'NATURE', zigzag: 'LIGHTNING', line: 'WIND' };
+const SHAPE_NAME: Record<SigilShape, string> = { C: 'C', L: 'L', v: 'v', zigzag: 'zigzag', line: 'line', U: 'U', Z: 'Z', peak: 'peak', M: 'M' };
 
 type Pt = { x: number; y: number };
 
@@ -51,6 +64,19 @@ function sigilPath(shape: SigilShape, x: number, y: number, size: number): Pt[] 
     pts = [{ x: x - h * 0.7, y: y - h * 0.8 }, { x, y: y + h * 0.8 }, { x: x + h * 0.7, y: y - h * 0.8 }];
   } else if (shape === 'zigzag') {
     pts = [-1, -0.5, 0, 0.5, 1].map((u, i) => ({ x: x + u * h, y: y + (i % 2 === 0 ? -0.7 : 0.7) * h }));
+  } else if (shape === 'U') {
+    pts = [{ x: x - h * 0.7, y: y - h * 0.8 }];
+    for (let k = 0; k <= 30; k++) {
+      const a = Math.PI - (k / 30) * Math.PI;
+      pts.push({ x: x + Math.cos(a) * h * 0.7, y: y + Math.sin(a) * h * 0.7 });
+    }
+    pts.push({ x: x + h * 0.7, y: y - h * 0.8 });
+  } else if (shape === 'Z') {
+    pts = [{ x: x - h * 0.7, y: y - h * 0.8 }, { x: x + h * 0.7, y: y - h * 0.8 }, { x: x - h * 0.7, y: y + h * 0.8 }, { x: x + h * 0.7, y: y + h * 0.8 }];
+  } else if (shape === 'peak') {
+    pts = [{ x: x - h * 0.6, y: y + h * 0.8 }, { x, y: y - h * 0.8 }, { x: x + h * 0.6, y: y + h * 0.8 }];
+  } else if (shape === 'M') {
+    pts = [-1, -0.5, 0, 0.5, 1].map((u, i) => ({ x: x + u * h, y: y + (i % 2 === 0 ? 0.7 : -0.7) * h }));
   } else {
     pts = [{ x: x - h, y }, { x: x + h, y }];
   }
@@ -72,23 +98,25 @@ function resample(pts: Pt[], n: number): Pt[] {
   return out;
 }
 
-export function tutorialDone(): boolean {
+export function tutorialDone(hero: Hero = 'wizard'): boolean {
   try {
-    return localStorage.getItem(DONE_KEY) === '1';
+    return localStorage.getItem(doneKey(hero)) === '1';
   } catch {
     return false;
   }
 }
 
-function markDone() {
+function markDone(hero: Hero) {
   try {
-    localStorage.setItem(DONE_KEY, '1');
+    localStorage.setItem(doneKey(hero), '1');
   } catch {
     // storage blocked: the tutorial shows again next time, which is fine
   }
 }
 
 export function createTutorial() {
+  let hero: Hero = 'wizard';
+  let STEPS = WIZARD_STEPS;
   let index = 0; // STEPS.length = the final "ready" page
   let misses = 0;
   let feedback: { text: string; good: boolean; at: number } | null = null;
@@ -101,7 +129,7 @@ export function createTutorial() {
     feedback = null;
     advanceAt = 0;
     shownAt = performance.now();
-    if (index >= STEPS.length) markDone();
+    if (index >= STEPS.length) markDone(hero);
   }
 
   function answer(ok: boolean, text: string) {
@@ -112,8 +140,10 @@ export function createTutorial() {
   }
 
   return {
-    /** Start from the first page. */
-    reset() {
+    /** Start from the first page, with this hero's spells. */
+    reset(next: Hero = 'wizard') {
+      hero = next;
+      STEPS = STEPS_BY_HERO[hero];
       goTo(0);
     },
     get onReadyPage() {
@@ -140,7 +170,7 @@ export function createTutorial() {
       }
       if (name === SHAPE_NAME[step.shape]) answer(true, `${step.name}! Nice!`);
       else if (name === null) answer(false, 'Not recognized: draw it BIGGER and a bit slower');
-      else answer(false, `That was ${SPELL_OF[name] ?? name}. Try the shape above`);
+      else answer(false, `That was ${STEPS.find((st) => st.shape === name)?.name ?? name}. Try the shape above`);
     },
     /** Open palm while the tutorial shows (the shield page). */
     palm() {

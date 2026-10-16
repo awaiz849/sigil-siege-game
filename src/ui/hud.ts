@@ -5,7 +5,7 @@
 //   bottom-left spellbook: each sigil drawn as a real shape, what it casts, what it beats,
 //               its mana cost, lightning / wind cooldown, and the palm = shield reminder
 import { CONFIG } from '../config.ts';
-import type { World } from '../game/types.ts';
+import type { Hero, World } from '../game/types.ts';
 import { castleMaxHp } from '../game/difficulty.ts';
 import { bossAlive } from '../game/world.ts';
 import { FONT_TEXT, FONT_TITLE } from './fonts.ts';
@@ -156,34 +156,57 @@ function drawScore(ctx: CanvasRenderingContext2D, world: World, s: number, w: nu
   ctx.fillText(`x${c}`, cx, cy + 1 * s);
 }
 
-type Row = { shape: SigilShape | 'palm'; name: string; color: string; cost: number; beats?: keyof typeof ELEMENT_CSS; self?: keyof typeof ELEMENT_CSS };
+/** One spellbook row. cooldown: which cooldown it uses ("hits all" slot, push/slow slot, tome). */
+type Row = {
+  shape: SigilShape | 'palm';
+  name: string;
+  color: string;
+  cost: number;
+  note?: string;
+  beats?: keyof typeof ELEMENT_CSS;
+  self?: keyof typeof ELEMENT_CSS;
+  cooldown?: 'all' | 'push' | 'tome';
+};
 
 const COST = CONFIG.MANA.cost;
-const ROWS: Row[] = [
-  { shape: 'C', name: 'WATER', color: ELEMENT_CSS.water, cost: COST.water, self: 'water', beats: 'fire' },
-  { shape: 'L', name: 'FIRE', color: ELEMENT_CSS.fire, cost: COST.fire, self: 'fire', beats: 'nature' },
-  { shape: 'v', name: 'NATURE', color: ELEMENT_CSS.nature, cost: COST.nature, self: 'nature', beats: 'water' },
-  { shape: 'zigzag', name: 'LIGHTNING', color: '#cfe6ff', cost: COST.lightning },
-  { shape: 'line', name: 'WIND', color: '#b8f0d8', cost: COST.wind },
-  { shape: 'palm', name: 'SHIELD', color: '#9fe6ff', cost: COST.shield },
-];
+const ROWS: Record<Hero, Row[]> = {
+  wizard: [
+    { shape: 'C', name: 'WATER', color: ELEMENT_CSS.water, cost: COST.water, self: 'water', beats: 'fire' },
+    { shape: 'L', name: 'FIRE', color: ELEMENT_CSS.fire, cost: COST.fire, self: 'fire', beats: 'nature' },
+    { shape: 'v', name: 'NATURE', color: ELEMENT_CSS.nature, cost: COST.nature, self: 'nature', beats: 'water' },
+    { shape: 'zigzag', name: 'LIGHTNING', color: '#cfe6ff', cost: COST.lightning, note: 'hits all', cooldown: 'all' },
+    { shape: 'line', name: 'WIND', color: '#b8f0d8', cost: COST.wind, note: 'push back', cooldown: 'push' },
+    { shape: 'palm', name: 'SHIELD', color: '#9fe6ff', cost: COST.shield, note: 'open palm' },
+  ],
+  warden: [
+    { shape: 'U', name: 'FROST', color: ELEMENT_CSS.water, cost: COST.frost, self: 'water', beats: 'fire' },
+    { shape: 'Z', name: 'FLAME', color: ELEMENT_CSS.fire, cost: COST.flame, self: 'fire', beats: 'nature' },
+    { shape: 'peak', name: 'THORN', color: ELEMENT_CSS.nature, cost: COST.thorn, self: 'nature', beats: 'water' },
+    { shape: 'M', name: 'ARCANE', color: '#c9a0ff', cost: COST.arcane, note: 'all + slow', cooldown: 'all' },
+    { shape: 'line', name: 'TIME WARP', color: '#b8a0ff', cost: COST.timewarp, note: 'slow all', cooldown: 'push' },
+    { shape: 'palm', name: 'TOME', color: '#ffd86a', cost: COST.tome, note: 'immune', cooldown: 'tome' },
+  ],
+};
 
-/** Cooldown of a row's spell: seconds left and the full cooldown (lightning and wind only). */
+/** Cooldown of a row's spell: seconds left and the full cooldown (null = none). */
 function cooldownOf(row: Row, world: World): { left: number; total: number } | null {
-  if (row.shape === 'zigzag') return { left: world.lightningCooldown, total: CONFIG.LIGHTNING_COOLDOWN_S };
-  if (row.shape === 'line') return { left: world.windCooldown, total: CONFIG.WIND_COOLDOWN_S };
+  const warden = world.hero === 'warden';
+  if (row.cooldown === 'all') return { left: world.lightningCooldown, total: warden ? CONFIG.WARDEN.arcaneCooldownS : CONFIG.LIGHTNING_COOLDOWN_S };
+  if (row.cooldown === 'push') return { left: world.windCooldown, total: warden ? CONFIG.WARDEN.timewarpCooldownS : CONFIG.WIND_COOLDOWN_S };
+  if (row.cooldown === 'tome') return { left: world.tomeCooldown, total: CONFIG.WARDEN.tomeCooldownS };
   return null;
 }
 
 function drawSpellbook(ctx: CanvasRenderingContext2D, world: World, s: number, h: number) {
   const rowH = 30 * s;
   const pw = 286 * s;
-  const ph = rowH * ROWS.length + 20 * s;
+  const rows = ROWS[world.hero];
+  const ph = rowH * rows.length + 20 * s;
   const x = 16 * s;
   const y = h - ph - 16 * s;
   panel(ctx, x, y, pw, ph, s);
 
-  ROWS.forEach((row, i) => {
+  rows.forEach((row, i) => {
     const cy = y + 10 * s + rowH * i + rowH / 2;
     const sx = x + 24 * s;
     const cooldown = cooldownOf(row, world);
@@ -204,12 +227,10 @@ function drawSpellbook(ctx: CanvasRenderingContext2D, world: World, s: number, h
       // "beats [icon]"
       ctx.fillText('beats', x + 150 * s, cy + 1 * s);
       drawElementIcon(ctx, row.beats, x + 214 * s, cy, 18 * s);
-    } else if (row.shape === 'zigzag') {
-      ctx.fillText(ready ? 'hits all' : '', x + 150 * s, cy + 1 * s);
-    } else if (row.shape === 'line') {
-      ctx.fillText(ready ? 'push back' : '', x + 150 * s, cy + 1 * s);
-    } else {
-      ctx.fillText('open palm', x + 150 * s, cy + 1 * s);
+    } else if (row.note) {
+      // Notes hide while the cooldown ring + seconds show in their place.
+      const cd = cooldownOf(row, world);
+      ctx.fillText(cd && cd.left > 0 ? '' : row.note, x + 150 * s, cy + 1 * s);
     }
     // Mana cost, right-aligned in mana blue.
     ctx.textAlign = 'right';

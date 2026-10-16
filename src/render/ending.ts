@@ -7,7 +7,7 @@
 // A new round puts everything back.
 import * as THREE from 'three';
 import { CONFIG } from '../config.ts';
-import type { Enemy, World } from '../game/types.ts';
+import type { Enemy, Hero, World } from '../game/types.ts';
 import { createEnemyModel, type EnemyModel } from './models.ts';
 import { whenGlbLoaded } from './glbModels.ts';
 import { WALL_TOP } from './environment.ts';
@@ -50,9 +50,10 @@ export function createEnding(refs: Refs) {
   const tmpLook = new THREE.Vector3();
   const arcTop = new THREE.Vector3();
 
-  // The hero's portrait for the victory banners, rendered once from his 3D model.
-  let portrait: THREE.Texture | null = null;
-  whenGlbLoaded('wizard', (model) => (portrait = renderPortrait(refs.renderer, model)));
+  // Each hero's portrait for the victory banners, rendered once from his 3D model.
+  let hero: Hero = 'wizard';
+  const portraits: Partial<Record<Hero, THREE.Texture>> = {};
+  for (const key of ['wizard', 'warden'] as const) whenGlbLoaded(key, (model) => (portraits[key] = renderPortrait(refs.renderer, model)));
 
   function start(next: 'win' | 'lose', world: World, camPos: THREE.Vector3, camLook: THREE.Vector3) {
     mode = next;
@@ -100,6 +101,7 @@ export function createEnding(refs: Refs) {
       pivot.rotation.y = Math.PI; // face the field (where the camera is)
       const cloth = new THREE.Mesh(new THREE.PlaneGeometry(w, h).translate(0, -h / 2, 0), new THREE.MeshBasicMaterial({ map: fabric, side: THREE.DoubleSide, transparent: true, alphaTest: 0.5 }));
       pivot.add(cloth);
+      const portrait = portraits[hero];
       if (portrait) {
         const face = new THREE.Mesh(
           new THREE.CircleGeometry(w * 0.36, 32),
@@ -129,6 +131,10 @@ export function createEnding(refs: Refs) {
   return {
     get active() {
       return mode !== null;
+    },
+    /** Whose face goes on the victory banners. */
+    setHero(next: Hero) {
+      hero = next;
     },
 
     /** Call every frame. Returns where the camera should be (and look), or null = normal camera. */

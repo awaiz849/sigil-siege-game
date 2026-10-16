@@ -226,6 +226,47 @@ function gallopLegs(mats: THREE.Material[], legs: NonNullable<GlbModelConfig['le
   };
 }
 
+/** A hero's staff that can swing (the model has no skeleton): the vertex shader rotates the staff's
+ *  vertices around the hand (forward = toward the field). Returns set(angle) in radians. */
+export function staffSwing(model: THREE.Object3D, staff: NonNullable<GlbModelConfig['staff']>) {
+  const uniforms = {
+    uSwing: { value: 0 },
+    uPivot: { value: new THREE.Vector3(...staff.pivot) },
+    uStaff: { value: new THREE.Vector3(staff.maxX, staff.minZ, staff.topY) },
+  };
+  model.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh) return;
+    for (const m of [mesh.material].flat()) {
+      m.onBeforeCompile = (shader) => {
+        Object.assign(shader.uniforms, uniforms);
+        shader.vertexShader = shader.vertexShader
+          .replace('#include <common>', `#include <common>
+            uniform float uSwing;
+            uniform vec3 uPivot, uStaff; // staff: max x, min z, ornament height`)
+          .replace('#include <begin_vertex>', `#include <begin_vertex>
+            {
+              // On the staff: far enough out to the side, and in front of the cape (or the top ornament).
+              float side = 1.0 - smoothstep(uStaff.x - 0.02, uStaff.x + 0.01, transformed.x);
+              float front = max(smoothstep(uStaff.y - 0.02, uStaff.y, transformed.z), step(uStaff.z, transformed.y));
+              float a = uSwing * side * front;
+              vec2 d = vec2(transformed.y - uPivot.y, transformed.z - uPivot.z);
+              float c = cos(a), s = sin(a);
+              transformed.y = uPivot.y + d.x * c - d.y * s;
+              transformed.z = uPivot.z + d.x * s + d.y * c;
+            }`);
+      };
+      m.customProgramCacheKey = () => 'staff-swing';
+      m.needsUpdate = true;
+    }
+  });
+  return {
+    set(angle: number) {
+      uniforms.uSwing.value = angle;
+    },
+  };
+}
+
 /** Recoloured copies of a texture (hue turned by `degrees`), made once and shared. */
 const hueCache = new Map<THREE.Texture, Map<number, THREE.Texture>>();
 function hueShifted(src: THREE.Texture, degrees: number): THREE.Texture {
