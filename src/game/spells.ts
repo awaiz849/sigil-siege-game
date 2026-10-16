@@ -4,6 +4,7 @@ import { CONFIG } from '../config.ts';
 import { effectiveness } from './types.ts';
 import type { Element, Enemy, FloatText, SpellName, Vec3, World } from './types.ts';
 import { removeEnemy } from './enemies.ts';
+import { logCast } from './roundLog.ts';
 
 /** Which spell each recognizer shape casts. "line" = shield (mouse debug only). */
 export const SIGIL_SPELLS: Record<string, SpellName> = {
@@ -94,6 +95,12 @@ export function castSpell(world: World, shape: string | null, strokeCentre: Scre
 /** Same as castSpell, but with the target already chosen (enemy id, or null = no target). */
 export function castSpellOn(world: World, shape: string | null, targetId: number | null): SpellResult {
   if (world.phase !== 'PLAYING') return result(world, 'ignored', null);
+  const r = castShape(world, shape, targetId);
+  logCast(world, shape, r.kind); // tuning log: pen down -> cast time
+  return r;
+}
+
+function castShape(world: World, shape: string | null, targetId: number | null): SpellResult {
   const spell = shape ? SIGIL_SPELLS[shape] : undefined;
   if (!spell) return fail(world, 'fizzle', null);
   if (spell === 'shield') return castShield(world);
@@ -155,6 +162,7 @@ function damageEnemy(world: World, enemy: Enemy, spellElement: Element | null): 
     world.score += hit.score;
     world.combo = Math.min(CONFIG.MAX_COMBO, world.combo + 1);
     world.stats.kills++;
+    world.log.killsByWave[world.wave - 1]++;
     if (enemy.type === 'boss') world.bossDefeated = true; // update() ends the round
     removeEnemy(world, enemy.id);
   }

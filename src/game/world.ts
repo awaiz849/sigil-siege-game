@@ -5,6 +5,7 @@ import type { Element, GameEvent, World } from './types.ts';
 import { updateEnemies } from './enemies.ts';
 import { updateSpawns } from './waves.ts';
 import { pushApart } from './crowd.ts';
+import { createRoundLog, logSeconds } from './roundLog.ts';
 
 export const ELEMENTS: Element[] = ['fire', 'water', 'nature'];
 
@@ -37,6 +38,7 @@ export function createWorld(difficulty: Difficulty = 'normal', seed: number = Da
     rng: seed >>> 0,
     events: [],
     stats: { spawned: { imp: 0, bird: 0, warlock: 0, boss: 0 }, kills: 0 },
+    log: createRoundLog(difficulty),
   };
 }
 
@@ -65,6 +67,7 @@ export function pick<T>(world: World, items: readonly T[]): T {
 export function damageCastle(world: World, enemyId: number, damage: number, cause: 'wall' | 'blast'): void {
   world.castleHp = Math.max(0, world.castleHp - damage);
   world.waveDamaged = true;
+  world.log.damageByWave[world.wave - 1] += damage;
   world.events.push({ type: 'castleHit', enemyId, damage, cause });
 }
 
@@ -85,6 +88,7 @@ export function update(world: World, dt: number): void {
   updateSpawns(world);
   updateEnemies(world, dt);
   pushApart(world);
+  logSeconds(world);
   checkEnd(world);
 }
 

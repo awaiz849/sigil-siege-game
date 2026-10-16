@@ -1,6 +1,7 @@
 // Plain data types for the game logic, plus the element rule. No three.js, no DOM:
 // the renderer and UI only READ these.
 import { CONFIG, type Difficulty } from '../config.ts';
+import type { RoundLog } from './roundLog.ts';
 
 export type Element = 'fire' | 'water' | 'nature';
 
@@ -121,4 +122,6 @@ export interface World {
   events: GameEvent[];
   /** Totals for tests and the end screen. */
   stats: { spawned: Record<EnemyType, number>; kills: number };
+  /** Tuning log for this round (roundLog.ts). */
+  log: RoundLog;
 }

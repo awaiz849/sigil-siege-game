@@ -8,6 +8,7 @@ import { createWorld, startRound, takeEvents, update } from '../src/game/world.t
 import { spawnEnemy, updateEnemies, warlockStopZ } from '../src/game/enemies.ts';
 import { TEXT, castShield, castSpell, castSpellOn, pickTarget } from '../src/game/spells.ts';
 import { pushApart } from '../src/game/crowd.ts';
+import { formatRoundLog, noteStrokeStart } from '../src/game/roundLog.ts';
 
 let failures = 0;
 let passes = 0;
@@ -313,6 +314,30 @@ function runEnemies(world: World, seconds: number): void {
   spawnEnemy(w4, 'imp', 'fire', 0);
   pushApart(w4);
   check('birds fly over ground enemies', bird.pos.x === 0);
+}
+
+// ---- Round log (A3 tuning): pen down -> cast, kills and damage per wave, enemies per second ----
+{
+  const w = startRound(createWorld('normal', 5));
+  for (let i = 0; i < 60; i++) update(w, 0.05); // 3 s
+  noteStrokeStart(w);
+  for (let i = 0; i < 30; i++) update(w, 0.05); // drawing for 1.5 s
+  const target = w.enemies[0];
+  cast(w, 'circle', target);
+  const stroke = w.log.strokes[0];
+  check('stroke logged', w.log.strokes.length === 1 && Math.abs(stroke.seconds - 1.5) < 1e-6, JSON.stringify(stroke));
+  cast(w, 'circle', target);
+  check('cast without pen-down not logged', w.log.strokes.length === 1);
+  check('enemies sampled each second', w.log.enemiesPerSecond.length === 4, String(w.log.enemiesPerSecond));
+  const kills = w.stats.kills;
+  check('kills per wave', w.log.killsByWave[0] === kills && kills > 0, String(w.log.killsByWave));
+
+  // Let enemies hit the castle in wave 1.
+  w.castleHp = 1e9;
+  while (w.time < 25) update(w, 0.05);
+  check('damage logged in wave 1', w.log.damageByWave[0] > 0 && w.log.damageByWave[1] === 0, String(w.log.damageByWave));
+  const report = formatRoundLog(w);
+  check('report has the lines', report.includes('pen down -> cast avg 1.50 s') && report.includes('castle damage per wave'), report);
 }
 
 if (failures > 0) throw new Error(`${failures} rule checks failed (${passes} passed)`);
