@@ -160,6 +160,8 @@ export function createOverlay(canvas: HTMLCanvasElement) {
   return {
     ctx,
     worldUi,
+    /** The drawing trail (main.ts tints it once the shape is recognized). */
+    trail,
     resize,
     draw,
     setMouseDebug(on: boolean) {

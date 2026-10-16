@@ -14,7 +14,7 @@ import { setMusicIntensity, updateMusic } from './audio/music.ts';
 import { callout } from './audio/voice.ts';
 import { createMouseInput } from './input/mouseInput.ts';
 import { createHandInput, type HandInput } from './input/handInput.ts';
-import { onPalm, onStrokeEnd, onStrokeStart } from './events.ts';
+import { onPalm, onStrokeEnd, onStrokePoint, onStrokeStart } from './events.ts';
 import { classify } from './recognizer/index.ts';
 import { createRecorder } from './recognizer/recorder.ts';
 import type { GameEvent, World } from './game/types.ts';
@@ -123,6 +123,27 @@ const SPELL_COLOR: Record<string, number> = { water: 0x3fa9ff, fire: 0xff5a2e, n
 
 // Pen down: start the pen-down -> cast timer for the tuning log.
 onStrokeStart(() => noteStrokeStart(world));
+
+// Live recognition while drawing: a few times a second the half-drawn stroke is classified;
+// once it is clearly a shape, the trail takes on that element (colour + particles) and the
+// wizard's orb glows in it.
+const SHAPE_SPELL: Record<string, string> = { C: 'water', L: 'fire', v: 'nature', zigzag: 'lightning', line: 'wind' };
+let livePoints: Array<{ x: number; y: number }> = [];
+let liveAt = 0;
+onStrokeStart(() => {
+  livePoints = [];
+  overlay.trail.setSpell(null);
+});
+onStrokePoint((x, y) => {
+  livePoints.push({ x, y });
+  const now = performance.now();
+  if (livePoints.length < CONFIG.LIVE_SHAPE.minPoints || now - liveAt < CONFIG.LIVE_SHAPE.everyMs) return;
+  liveAt = now;
+  const guess = classify(livePoints);
+  const spell = guess.name && guess.score >= CONFIG.LIVE_SHAPE.minScore ? SHAPE_SPELL[guess.name] : null;
+  overlay.trail.setSpell(spell);
+  if (spell) world3d.wizardElement(SPELL_COLOR[spell] ?? null);
+});
 
 // Every finished stroke: recorder first (if armed), otherwise recognize it and cast.
 onStrokeEnd((points) => {

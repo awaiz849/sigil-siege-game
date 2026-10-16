@@ -296,6 +296,10 @@ export function createScene(canvas: HTMLCanvasElement) {
     wizardCast(color: number) {
       wizard.cast(color);
     },
+    /** The element being drawn (live recognition): the wizard's orb glows in it. */
+    wizardElement(color: number | null) {
+      wizard.setElement(color);
+    },
     /** Light up the whole scene (lightning). */
     lightningFlash() {
       lightningT = 1;

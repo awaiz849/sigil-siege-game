@@ -166,6 +166,9 @@ export const CONFIG = {
   END_SCREEN_DELAY_S: 1.5,
 
   // ---- Overlay UI ----
+  /** Live recognition while drawing (trail colour + particles, wizard's orb): classify the
+   *  half-drawn stroke every everyMs once it has minPoints; show the element above minScore. */
+  LIVE_SHAPE: { everyMs: 120, minPoints: 12, minScore: 0.84 },
   /** Each trail point fades out over this many ms. */
   TRAIL_FADE_MS: 600,
   /** Floating texts ("SUPER EFFECTIVE!", "+300") live this long and rise this many px. */

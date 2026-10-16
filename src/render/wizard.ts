@@ -4,6 +4,8 @@
 // forward when a spell is cast, arms spread with a cyan glow for the shield.
 // When public/models/wizard.glb is loaded it replaces the primitive figure (orb, light and
 // rune circle stay); the model then leans into each cast instead of moving its arms.
+// He follows your real hand: the body turns toward where the cursor points, and the magic orb
+// floats toward the cursor (raised while drawing), glowing in the element being drawn / last cast.
 import * as THREE from 'three';
 import { toon } from './toon.ts';
 import { onCursor, type Pose } from '../events.ts';
@@ -126,7 +128,16 @@ export function createWizard() {
   let runeOpacity = 0;
 
   let pose: Pose = 'other';
-  onCursor((_x, _y, p) => (pose = p));
+  // Cursor position, -0.5..0.5 across / down the screen.
+  let cx = 0;
+  let cy = 0;
+  onCursor((x, y, p) => {
+    pose = p;
+    cx = x / window.innerWidth - 0.5;
+    cy = y / window.innerHeight - 0.5;
+  });
+  /** The current element's colour (being drawn, or the last spell); null = gold. */
+  let element: THREE.Color | null = null;
   let castT = 0; // 1 right after a cast, fades to 0
   const orbColor = new THREE.Color(PALETTE.gold);
   const target = new THREE.Color(PALETTE.gold);
@@ -140,6 +151,8 @@ export function createWizard() {
       castT = Math.max(0, castT - dt * 3);
       body.position.y = Math.sin(t * 2) * 0.03;
       body.rotation.z = Math.sin(t * 1.3) * 0.02;
+      // Turn toward where the hand points (facing -z: a negative turn looks right).
+      const yaw = -cx * 0.9;
       cape.rotation.x = 0.12 + Math.sin(t * 2.2) * 0.05;
 
       // Arm targets per pose (rotation.x > 0 swings the arm forward, toward the field).
@@ -165,16 +178,21 @@ export function createWizard() {
       // GLB wizard: lean forward (toward the field, -z) on a cast, a little while drawing.
       const lean = -(castT * 0.22 + (pose === 'point' ? 0.06 : 0));
       glbFigure.rotation.x += (lean - glbFigure.rotation.x) * k;
+      body.rotation.y += (yaw - body.rotation.y) * k * 0.6;
 
-      // Orb: rides on the right hand while drawing, floats in front otherwise; flares on cast.
-      if (pose === 'point') {
+      // Orb: follows the hand cursor in front of him (higher while drawing); the primitive
+      // wizard still holds it in his raised right hand.
+      if (pose === 'point' && figure.visible) {
         right.hand.getWorldPosition(tmp);
         body.worldToLocal(tmp);
         orbGroup.position.lerp(tmp.add(new THREE.Vector3(0, 0.15, 0)), k);
       } else {
-        orbGroup.position.lerp(new THREE.Vector3(0, 1.15 + Math.sin(t * 3) * 0.05, -0.6), k);
+        const raise = pose === 'point' ? 0.45 : 0;
+        orbGroup.position.lerp(tmp.set(cx * 1.6, 1.2 - cy * 0.9 + raise + Math.sin(t * 3) * 0.05, -0.65), k);
       }
-      target.set(pose === 'palm' ? 0x9fe6ff : PALETTE.gold);
+      if (pose === 'palm') target.set(0x9fe6ff);
+      else if (element) target.copy(element);
+      else target.set(PALETTE.gold);
       orbColor.lerp(target, k);
       if (castT <= 0) {
         orbMat.color.copy(orbColor);
@@ -184,7 +202,7 @@ export function createWizard() {
       }
       const s = 1 + castT * 1.5 + Math.sin(t * 6) * 0.05;
       orb.scale.setScalar(s);
-      orbGlow.scale.setScalar(0.9 * s + (pose === 'palm' ? 0.8 : 0));
+      orbGlow.scale.setScalar(0.9 * s + (pose === 'palm' ? 0.8 : 0) + (element ? 0.35 : 0));
       orb.rotation.y = t * 2;
       light.intensity = 1.5 + castT * 4 + (pose === 'palm' ? 1.5 : 0);
 
@@ -197,9 +215,16 @@ export function createWizard() {
       if (castT <= 0) runeMat.color.copy(orbColor);
     },
 
-    /** A spell was cast: arms thrust, orb flashes in the spell colour. */
+    /** The element being drawn right now (live recognition) or null: the orb glows in its colour. */
+    setElement(color: number | null) {
+      if (color === null) return; // keep the last element until a new one is recognized
+      element = (element ?? new THREE.Color()).set(color);
+    },
+
+    /** A spell was cast: arms thrust, orb flashes in the spell colour (and keeps glowing in it). */
     cast(color: number) {
       castT = 1;
+      element = (element ?? new THREE.Color()).set(color);
       runeMat.color.set(color);
       orbMat.color.set(color);
       orbMat.emissive.set(color);
