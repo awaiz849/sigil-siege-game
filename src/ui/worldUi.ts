@@ -47,8 +47,9 @@ export function createWorldUi() {
   let shieldAt = -Infinity;
   let lightningFlashAt = -Infinity;
   let windAt = -Infinity;
+  let killFlashAt = -Infinity;
   let lastStroke: Point[] = [];
-  let burn: { points: Point[]; color: string; born: number; fizzle: boolean } | null = null;
+  let burn: { points: Point[]; color: string; born: number; fizzle: boolean; perfect: boolean } | null = null;
 
   onStrokeStart(() => {
     stroke = [];
@@ -92,12 +93,13 @@ export function createWorldUi() {
       }
     },
 
-    /** The sigil you just drew flares in the spell's colour (or crumbles on a fizzle). */
+    /** The sigil you just drew flares in the spell's colour (or crumbles on a fizzle).
+     *  A PERFECT SIGIL burns gold, with sparkles rising off it. */
     burnStroke(result: SpellResult, now: number) {
       if (lastStroke.length < 2 || result.kind === 'ignored' || result.kind === 'nomana') return;
       const fizzle = result.kind === 'fizzle';
-      const color = fizzle ? '#b06060' : SPELL_CSS[result.spell ?? ''] ?? '#ffffff';
-      burn = { points: lastStroke, color, born: now, fizzle };
+      const color = fizzle ? '#b06060' : result.perfect ? '#ffd86a' : SPELL_CSS[result.spell ?? ''] ?? '#ffffff';
+      burn = { points: lastStroke, color, born: now, fizzle, perfect: result.perfect };
     },
 
     /** Visual extras for a cast (lightning bolts, shield flash). */
@@ -111,6 +113,7 @@ export function createWorldUi() {
       }
       if (result.spell === 'shield') shieldAt = now;
       if (result.kind === 'push') windAt = now;
+      if (result.kind === 'kill') killFlashAt = now;
     },
 
     draw(ctx: CanvasRenderingContext2D, world: World, view: View, now: number) {
@@ -300,7 +303,7 @@ export function createWorldUi() {
 
   function drawBurn(ctx: CanvasRenderingContext2D, now: number) {
     if (!burn) return;
-    const age = (now - burn.born) / 450;
+    const age = (now - burn.born) / (burn.perfect ? 800 : 450);
     if (age >= 1) {
       burn = null;
       return;
@@ -333,6 +336,33 @@ export function createWorldUi() {
       ctx.stroke();
     }
     ctx.restore();
+    // PERFECT: golden four-point sparkles rising off the stroke.
+    if (burn.perfect) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = '#fff2b0';
+      burn.points.forEach((p, k) => {
+        if (k % 3) return;
+        const rise = age * (30 + (k * 37) % 40);
+        const r = (5 + (k % 4)) * (1 - age);
+        const x = p.x + Math.sin(k * 1.7) * 10 * age;
+        const y = p.y - rise;
+        ctx.globalAlpha = 1 - age;
+        ctx.beginPath();
+        ctx.moveTo(x, y - r * 2);
+        ctx.lineTo(x + r * 0.5, y);
+        ctx.lineTo(x, y + r * 2);
+        ctx.lineTo(x - r * 0.5, y);
+        ctx.closePath();
+        ctx.moveTo(x - r * 2, y);
+        ctx.lineTo(x, y + r * 0.5);
+        ctx.lineTo(x + r * 2, y);
+        ctx.lineTo(x, y - r * 0.5);
+        ctx.closePath();
+        ctx.fill();
+      });
+      ctx.restore();
+    }
   }
 
   function drawBolts(ctx: CanvasRenderingContext2D, now: number) {
@@ -364,6 +394,13 @@ export function createWorldUi() {
     // Red edge glow after a castle hit.
     const hit = (now - hitGlowAt) / (CONFIG.HIT_GLOW_S * 1000);
     if (hit < 1) edgeGlow(ctx, w, h, `rgba(255, 30, 20, ${0.55 * (1 - hit)})`);
+
+    // Kill: a very short white flash (goes with the hit-stop in main.ts).
+    const kf = (now - killFlashAt) / (CONFIG.KILL_FLASH_S * 1000);
+    if (kf < 1) {
+      ctx.fillStyle = `rgba(255, 255, 255, ${0.22 * (1 - kf)})`;
+      ctx.fillRect(0, 0, w, h);
+    }
 
     // Lightning: quick white-blue screen flash.
     const lf = (now - lightningFlashAt) / 200;

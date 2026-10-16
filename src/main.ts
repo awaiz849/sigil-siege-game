@@ -143,8 +143,15 @@ onPalm(() => {
   if (world.phase === 'PLAYING' && !screens.current) showCast(castShield(world));
 });
 
+/** Hit-stop: the game freezes until this time (ms) after a kill, so kills feel heavy. */
+let hitStopUntil = 0;
+
 /** 3D + overlay feedback for a cast (texts arrive separately, as game events). */
 function showCast(result: SpellResult, from?: { x: number; y: number }) {
+  if (result.kind === 'kill') {
+    hitStopUntil = performance.now() + CONFIG.HIT_STOP_MS;
+    world3d.shake(0.25);
+  }
   const color = result.spell ? SPELL_COLOR[result.spell] : undefined;
   if (color !== undefined) {
     for (const hit of result.hits) {
@@ -209,11 +216,11 @@ function frame(now: number) {
   hand?.update();
   screens.update(now);
   updateMusic();
-  // Paused: the round and the 3D scene freeze (time stands still).
-  const paused = screens.current === 'pause';
-  if (!paused) update(world, dt);
+  // Paused, or a kill's hit-stop: the round and the 3D scene freeze (time stands still).
+  const frozen = screens.current === 'pause' || now < hitStopUntil;
+  if (!frozen) update(world, dt);
   handleEvents(takeEvents(world));
-  world3d.render(world, paused ? 0 : dt);
+  world3d.render(world, frozen ? 0 : dt);
   // HUD (+ pause button) only during a round; menus draw over the live 3D scene.
   overlay.draw(
     world.phase === 'MENU' || screens.current ? null : world,
