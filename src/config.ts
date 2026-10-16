@@ -142,6 +142,10 @@ export const CONFIG = {
   SHADOWS: false,
   /** Glow on emissive things. Turn off first if FPS drops (after shadows). */
   BLOOM: { enabled: true, strength: 0.9, radius: 0.55, threshold: 0.8 },
-  /** First-person camera on the wall. back = metres behind the wall's front face (negative = leaning over). */
-  CAMERA: { fov: 55, eyeHeight: 2.2, back: 1.8, lookAtY: 1.5, lookAtZ: -22, crenelHalfWidth: 1.35 },
+  /** Night look: sky fill light, moonlight, fog density. Raise ambient/moon if the demo screen is too dark. */
+  NIGHT: { ambient: 1.1, moon: 2.2, fog: 0.017 },
+  /** Third-person camera behind and above the wizard (CoC-style).
+   *  height / back = camera position above the walkway and behind the wall's front face;
+   *  x = sideways offset (over the shoulder). wizardX/wizardBack = where the wizard stands. */
+  CAMERA: { fov: 60, height: 6.2, back: 6.5, x: 0.6, lookAtY: 3.5, lookAtZ: -18, wizardX: -0.7, wizardBack: 1.1, crenelHalfWidth: 1.35 },
 };

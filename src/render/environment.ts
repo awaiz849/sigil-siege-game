@@ -136,7 +136,7 @@ function createMoon(): THREE.Group {
   );
   halo.scale.set(80, 80, 1);
   g.add(halo, moon);
-  g.position.set(140, 75, -260);
+  g.position.set(-55, 62, -280);
   return g;
 }
 

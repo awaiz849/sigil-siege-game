@@ -14,8 +14,8 @@ type View = {
   shadow: THREE.Mesh;
   stunStars: THREE.Group;
   element: Enemy['element'];
-  /** Non-glowing materials: flashed white when the enemy is hit. */
-  flashMats: THREE.MeshStandardMaterial[];
+  /** Body materials (not the bright glow ones): flashed white when the enemy is hit. */
+  flashMats: Array<{ mat: THREE.MeshStandardMaterial; base: THREE.Color; baseIntensity: number }>;
   hp: number;
   hitT: number; // 1 right after a hit, fades to 0
   last: Enemy; // last seen state (used for the death effect after removal)
@@ -56,9 +56,10 @@ export function createEnemyView(scene: THREE.Scene, particles: Particles) {
     const flashMats = new Set<THREE.MeshStandardMaterial>();
     model.group.traverse((o) => {
       const m = (o as THREE.Mesh).material;
-      if (m instanceof THREE.MeshStandardMaterial && m.emissive.getHex() === 0) flashMats.add(m);
+      if (m instanceof THREE.MeshStandardMaterial && m.emissiveIntensity < 1) flashMats.add(m);
     });
-    views.set(enemy.id, { model, shadow, stunStars, element: enemy.element, flashMats: [...flashMats], hp: enemy.hp, hitT: 0, last: { ...enemy, pos: { ...enemy.pos } }, spawnT: t });
+    const flash = [...flashMats].map((mat) => ({ mat, base: mat.emissive.clone(), baseIntensity: mat.emissiveIntensity }));
+    views.set(enemy.id, { model, shadow, stunStars, element: enemy.element, flashMats: flash, hp: enemy.hp, hitT: 0, last: { ...enemy, pos: { ...enemy.pos } }, spawnT: t });
     // Puff of dust where it appears.
     particles.burst(new THREE.Vector3(enemy.pos.x, 0.4, enemy.pos.z), 0x8a7a9a, 12, 2.5, 1, 0.6);
   }
@@ -114,7 +115,17 @@ export function createEnemyView(scene: THREE.Scene, particles: Particles) {
         if (enemy.hp < view.hp) view.hitT = 1;
         view.hp = enemy.hp;
         view.hitT = Math.max(0, view.hitT - dt * 4);
-        for (const m of view.flashMats) m.emissive.setScalar(view.hitT * 0.9);
+        for (const f of view.flashMats) {
+          if (view.hitT > 0) {
+            f.mat.emissive.setRGB(1, 1, 1);
+            f.mat.emissiveIntensity = f.baseIntensity + view.hitT * 0.9;
+          } else if (f.mat.emissiveIntensity !== f.baseIntensity) {
+            f.mat.emissive.copy(f.base);
+            f.mat.emissiveIntensity = f.baseIntensity;
+          } else {
+            f.base.copy(f.mat.emissive); // keep up with boss element swaps
+          }
+        }
         g.position.z -= view.hitT * 0.35;
         g.rotation.x = -view.hitT * 0.25;
 

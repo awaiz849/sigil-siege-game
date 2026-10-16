@@ -128,10 +128,12 @@ function showCast(result: SpellResult, from?: { x: number; y: number }) {
     for (const hit of result.hits) {
       const burst = () => world3d.burstAt(hit.pos, hit.enemyId, color, hit.effect === 'strong' ? 40 : 20);
       // Element spells fly as an orb from the sigil to the target; lightning strikes at once.
-      if (from && result.spell !== 'lightning') world3d.castProjectile(from, hit.pos, hit.enemyId, color, burst);
+      if (from && result.spell !== 'lightning') world3d.castProjectile(hit.pos, hit.enemyId, color, burst);
       else burst();
     }
   }
+  if (color !== undefined && result.kind !== 'fizzle' && result.kind !== 'cooldown') world3d.wizardCast(color);
+  if (result.spell === 'lightning' && result.hits.length > 0) world3d.lightningFlash();
   overlay.worldUi.handleCast(result, view, performance.now());
   playCast(result);
 }

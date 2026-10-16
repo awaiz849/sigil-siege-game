@@ -25,7 +25,8 @@ function elementMaterials(element: Element) {
   const color = new THREE.Color(ELEMENT_COLOR[element]);
   const glow = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 2.2 });
   // Body stone gets a slight tint of the element so the silhouette already hints at it.
-  const stone = new THREE.MeshStandardMaterial({ color: tintedStone(element), flatShading: true, roughness: 0.9 });
+  // A faint glow of the element in the body: monsters read clearly against the night.
+  const stone = new THREE.MeshStandardMaterial({ color: tintedStone(element), flatShading: true, roughness: 0.9, emissive: color, emissiveIntensity: 0.22 });
   return {
     glow,
     stone,
@@ -34,6 +35,7 @@ function elementMaterials(element: Element) {
       glow.color.copy(c);
       glow.emissive.copy(c);
       stone.color.copy(tintedStone(e));
+      stone.emissive.copy(c);
     },
   };
 }
