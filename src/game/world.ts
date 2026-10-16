@@ -2,6 +2,7 @@
 // Logic updates it; the renderer and UI read it every frame. No drawing here.
 import { CONFIG, type Difficulty } from '../config.ts';
 import type { Element, World } from './types.ts';
+import { updateEnemies } from './enemies.ts';
 
 export const ELEMENTS: Element[] = ['fire', 'water', 'nature'];
 
@@ -67,6 +68,7 @@ export function updateWorld(world: World, dt: number): void {
   world.time += dt;
   world.lightningCooldown = Math.max(0, world.lightningCooldown - dt);
   updateWave(world);
+  updateEnemies(world, dt);
   checkEnd(world);
 }
 
