@@ -163,8 +163,21 @@ export const CONFIG = {
   /** Soft wind under the music (filtered noise). Kept low: loud, it sounds like a hiss in the menus. 0 = off. */
   MUSIC_WIND: 0.04,
   /** Voice callouts (browser speech synthesis, offline system voices): the spell name on every cast
-   *  that works. pitch < 1 = deeper wizard voice. minGapMs stops it machine-gunning words. */
-  VOICE: { enabled: true, volume: 1, rate: 1.15, pitch: 0.7, minGapMs: 250 },
+   *  that works. pitch < 1 = deeper wizard voice. minGapMs stops it machine-gunning words.
+   *  names = what is shouted per spell (short, so speech says it quickly); a missing one says the spell id. */
+  VOICE: {
+    enabled: true, volume: 1, rate: 1.15, pitch: 0.7, minGapMs: 250,
+    names: {
+      // Wizard
+      water: 'Tidal Wave!', fire: 'Fireball!', nature: 'Thorn Lash!',
+      lightning: 'Thunderstorm!', wind: 'Gale!', shield: 'Barrier!',
+      // Grand Warden (level 2)
+      frost: 'Frost Nova!', flame: 'Soul Flame!', thorn: 'Thorn Spire!',
+      arcane: 'Arcane Rain!', timewarp: 'Time Warp!', tome: 'Eternal Tome!',
+      // Both heroes
+      meteor: 'Meteor!',
+    } as Record<string, string>,
+  },
   /** Music tempo per intensity level: 0 menu (calm), 1 wave 1, 2 wave 2, 3 wave 3, 4 boss. */
   MUSIC_BPM: [80, 92, 100, 108, 118],
 

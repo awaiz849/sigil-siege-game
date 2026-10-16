@@ -1,4 +1,4 @@
-// Voice callouts: the wizard shouts the spell name ("Water!", "Storm!") with the browser's built-in
+// Voice callouts: the wizard shouts the spell name ("Tidal Wave!", "Fireball!") with the browser's built-in
 // speech synthesis. Chrome's system voices (e.g. Microsoft David / Zira on Windows) work offline;
 // we prefer a local English voice and never wait for a network one. Off if the browser has none.
 import { CONFIG } from '../config.ts';
