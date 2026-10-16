@@ -201,7 +201,9 @@ export function createScreens(opts: Opts) {
     // The two steps, ticked off as they pass.
     const steps = [
       { text: 'Show your OPEN PALM', icon: 'palm' as const },
-      { text: 'Now POINT with one finger', icon: 'point' as const },
+      CONFIG.INPUT_MODE === 'pinch'
+        ? { text: 'Now PINCH thumb + index', icon: 'point' as const }
+        : { text: 'Now POINT with one finger', icon: 'point' as const },
     ];
     steps.forEach((st, i) => {
       const y = py + ph + (50 + i * 56) * s;
@@ -230,6 +232,7 @@ export function createScreens(opts: Opts) {
         ctx.stroke();
       }
       if (st.icon === 'palm') drawPalm(ctx, cx + 44 * s, y, 30 * s, '#9fe6ff');
+      else if (CONFIG.INPUT_MODE === 'pinch') drawPinch(ctx, cx + 44 * s, y, 30 * s, GOLD);
       else drawPointer(ctx, cx + 44 * s, y, 30 * s, GOLD);
       ctx.textAlign = 'left';
       ctx.font = `${22 * s}px ${FONT_TITLE}`;
@@ -417,5 +420,22 @@ function drawPointer(ctx: CanvasRenderingContext2D, x: number, y: number, size: 
   ctx.fill();
   roundRect(ctx, x - 6 * u, y - 11 * u, 3 * u, 11 * u, 1.5 * u);
   ctx.fill();
+  ctx.restore();
+}
+
+/** Pinch: thumb and index tips touching (an "OK" ring) with the other fingers up. */
+function drawPinch(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, color: string) {
+  const u = size / 20;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 2.6 * u;
+  ctx.beginPath();
+  ctx.arc(x - 2 * u, y + 2 * u, 4.5 * u, 0, Math.PI * 2);
+  ctx.stroke();
+  for (let k = 0; k < 3; k++) {
+    roundRect(ctx, x + 1.5 * u + k * 3 * u, y - 10 * u + k * 0.8 * u, 2.4 * u, 10 * u, 1.2 * u);
+    ctx.fill();
+  }
   ctx.restore();
 }

@@ -5,7 +5,7 @@ export type Difficulty = 'easy' | 'normal' | 'hard';
 export const CONFIG = {
   // ---- Input ----
   /** "poses" = finger poses, "pinch" = thumb-index pinch fallback. */
-  INPUT_MODE: 'poses' as 'poses' | 'pinch',
+  INPUT_MODE: 'pinch' as 'poses' | 'pinch',
   /** Frames a pose must be stable before it counts. */
   POSE_STABLE_FRAMES: 3,
   /** Pinch thresholds (thumb-index distance / hand size) and release delay. */

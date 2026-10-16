@@ -12,8 +12,8 @@ No keyboard, mouse or touch is needed at any point, including the menus, startin
 
 | Hand pose | What it does |
 |---|---|
-| Index finger out | Pen down: draw a sigil |
-| Index + middle finger out | Pen up: the spell is cast |
+| Pinch thumb + index | Pen down: draw a sigil (the cursor is between your fingertips) |
+| Release the pinch | Pen up: the spell is cast |
 | Open palm | Shield (blocks charging warlocks and stuns them) |
 | Fist / anything else | Move the cursor without drawing |
 | Hold open palm 1.2 s | Start / play again |
@@ -60,7 +60,8 @@ webcam -> MediaPipe HandLandmarker -> One Euro filter -> finger poses -> stroke
 2. **Smoothing**: a One Euro filter removes fingertip jitter without adding lag on fast moves.
 3. **Poses**: a finger counts as extended when its tip is clearly farther from the wrist than its
    middle joint, so it works at any hand angle. A pose must hold for 3 frames before it counts.
-   A pinch mode is kept as a fallback.
+   Drawing uses a pinch (thumb + index, with two thresholds so it doesn't flicker); a pointing-finger
+   mode is kept in `config.ts` (`INPUT_MODE: "poses"`).
 4. **Recognition**: a quick geometric check first (almost straight = line; closed vs open stroke),
    then our own port of the $1 Unistroke Recognizer against templates generated from math.
    If nothing is confident it retries against all templates; below a score of 0.8 the spell fizzles.
