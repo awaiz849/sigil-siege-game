@@ -75,6 +75,10 @@ export const CONFIG = {
     strongRefund: 12,
     fizzle: 6,
   },
+  /** METEOR ultimate (fast hand "throw"): the meter fills from kills and PERFECT SIGILs; when full,
+   *  a throw drops a meteor on the monster nearest the aim point and damages everything within
+   *  radius (world units). Meteor kills don't refill the meter. */
+  METEOR: { meterMax: 100, perKill: 10, perPerfect: 10, damage: 3, radius: 6 },
   LIGHTNING_COOLDOWN_S: 10,
   SHIELD_STUN_S: 3,
   /** WIND (drawn line): pushes walking enemies this many units back, then a cooldown. */

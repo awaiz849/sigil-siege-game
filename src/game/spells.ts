@@ -6,8 +6,8 @@ import type { Element, Enemy, FloatText, SpellName, Vec3, World } from './types.
 import { removeEnemy } from './enemies.ts';
 import { logCast } from './roundLog.ts';
 
-/** Which spell each recognizer shape casts. The shield is the open palm, not a shape. */
-export const SIGIL_SPELLS: Record<string, SpellName> = {
+/** Which spell each recognizer shape casts. The shield (open palm) and meteor (hand throw) are gestures, not shapes. */
+export const SIGIL_SPELLS: Record<string, Exclude<SpellName, 'shield' | 'meteor'>> = {
   C: 'water',
   L: 'fire',
   v: 'nature',
@@ -32,6 +32,8 @@ export const TEXT = {
   wind: 'WIND!',
   noMana: 'NO MANA',
   perfect: (bonus: number) => `PERFECT SIGIL! +${bonus}`,
+  meteor: 'METEOR!',
+  meteorCharging: (percent: number) => `METEOR ${percent}%`,
   cooldown: (spell: SpellName, seconds: number) => `${spell.toUpperCase()} ${Math.ceil(seconds)}s`,
   kill: (score: number) => `+${score}`,
 };
@@ -58,8 +60,9 @@ export interface SpellResult {
   /** hit = damage only, kill = at least one kill, block = shield stopped warlocks,
    *  miss = no target / nothing to block, fizzle = shape not recognized,
    *  push = wind pushed enemies back, cooldown = lightning / wind not ready (no penalty),
-   *  nomana = not enough mana (nothing happens, no penalty), ignored = not in a round. */
-  kind: 'hit' | 'kill' | 'block' | 'push' | 'miss' | 'fizzle' | 'cooldown' | 'nomana' | 'ignored';
+   *  nomana = not enough mana (nothing happens, no penalty), charging = meteor meter not full
+   *  (nothing happens, no penalty), ignored = not in a round / nothing to aim at. */
+  kind: 'hit' | 'kill' | 'block' | 'push' | 'miss' | 'fizzle' | 'cooldown' | 'nomana' | 'charging' | 'ignored';
   spell: SpellName | null;
   hits: Hit[];
   /** Warlocks the shield blocked. */
@@ -75,6 +78,8 @@ export interface SpellResult {
   texts: FloatText[];
   /** The shape was drawn cleanly enough for the PERFECT SIGIL bonus (see CONFIG.PERFECT_SIGIL). */
   perfect: boolean;
+  /** Meteor only: where it landed (world units), for the explosion. */
+  impactPos: Vec3 | null;
 }
 
 /**
@@ -132,6 +137,7 @@ function rewardPerfect(world: World, r: SpellResult): void {
   world.score += bonus;
   world.mana = Math.min(CONFIG.MANA.max, world.mana + mana);
   world.stats.perfects++;
+  chargeUltimate(world, CONFIG.METEOR.perPerfect);
   r.perfect = true;
   r.scoreGained += bonus;
   const text: FloatText = { text: TEXT.perfect(bonus), pos: null, tone: 'great' };
@@ -145,7 +151,6 @@ function castShape(world: World, shape: string | null, targetId: number | null):
     world.mana = Math.max(0, world.mana - CONFIG.MANA.fizzle);
     return fail(world, 'fizzle', null);
   }
-  if (spell === 'shield') return castShield(world);
   if (spell === 'lightning') return castLightning(world);
   if (spell === 'wind') return castWind(world);
 
@@ -218,6 +223,38 @@ export function castShield(world: World): SpellResult {
   return result(world, 'block', 'shield', { blockedIds: charging.map((w) => w.id) }, texts);
 }
 
+/** Fill the METEOR meter (capped). */
+function chargeUltimate(world: World, amount: number): void {
+  world.ultimate = Math.min(CONFIG.METEOR.meterMax, world.ultimate + amount);
+}
+
+/**
+ * METEOR ultimate (fast hand throw). Needs a full meter; lands on the monster nearest the aim point
+ * on screen and hits every monster within METEOR.radius of it (no element, stun x2 still counts).
+ * Not full = "METEOR 60%", nothing happens. No monster to aim at = ignored, the meter is kept.
+ */
+export function castMeteor(world: World, aim: ScreenPoint, project: ProjectFn): SpellResult {
+  if (world.phase !== 'PLAYING') return result(world, 'ignored', 'meteor');
+  const { meterMax, radius, damage } = CONFIG.METEOR;
+  if (world.ultimate < meterMax) {
+    const percent = Math.floor((world.ultimate / meterMax) * 100);
+    return result(world, 'charging', 'meteor', {}, [{ text: TEXT.meteorCharging(percent), pos: null, tone: 'info' }]);
+  }
+  const target = world.enemies.find((e) => e.id === pickTarget(world, aim, project));
+  if (!target) return result(world, 'ignored', 'meteor');
+
+  world.ultimate = 0;
+  const impact = { ...target.pos, y: 0 };
+  const inBlast = world.enemies.filter((e) => Math.hypot(e.pos.x - impact.x, e.pos.z - impact.z) <= radius);
+  const hits = inBlast.map((e) => damageEnemy(world, e, null, damage, false));
+  const r = finish(world, 'meteor', hits);
+  r.impactPos = impact;
+  const text: FloatText = { text: TEXT.meteor, pos: impact, tone: 'great' };
+  r.texts.unshift(text);
+  world.events.push({ type: 'floatText', ...text });
+  return r;
+}
+
 /** Damage multiplier: effectiveness() of the elements (lightning has none), then x2 if stunned. */
 export function damageMultiplier(spellElement: Element | null, enemy: Enemy): { mult: number; effect: Hit['effect'] } {
   let mult = spellElement ? effectiveness(spellElement, enemy.element) : 1;
@@ -226,10 +263,11 @@ export function damageMultiplier(spellElement: Element | null, enemy: Enemy): { 
   return { mult, effect };
 }
 
-/** Apply base damage (times multipliers) to one enemy; a kill scores 100 x combo and raises the combo. */
-function damageEnemy(world: World, enemy: Enemy, spellElement: Element | null): Hit {
+/** Apply base damage (times multipliers) to one enemy; a kill scores 100 x combo, raises the combo
+ *  and (unless chargesUltimate is false, i.e. meteor kills) fills the METEOR meter. */
+function damageEnemy(world: World, enemy: Enemy, spellElement: Element | null, base = CONFIG.DMG_BASE, chargesUltimate = true): Hit {
   const { mult, effect } = damageMultiplier(spellElement, enemy);
-  const damage = CONFIG.DMG_BASE * mult;
+  const damage = base * mult;
   enemy.hp = Math.max(0, enemy.hp - damage);
   const hit: Hit = { enemyId: enemy.id, damage, effect, stunned: enemy.stunT > 0, killed: false, score: 0, pos: { ...enemy.pos } };
 
@@ -240,6 +278,7 @@ function damageEnemy(world: World, enemy: Enemy, spellElement: Element | null): 
     world.combo = Math.min(CONFIG.MAX_COMBO, world.combo + 1);
     world.stats.kills++;
     world.log.killsByWave[world.wave - 1]++;
+    if (chargesUltimate) chargeUltimate(world, CONFIG.METEOR.perKill);
     if (enemy.type === 'boss') world.bossDefeated = true; // update() ends the round
     removeEnemy(world, enemy.id);
   }
@@ -278,5 +317,5 @@ function result(
   texts: FloatText[] = [],
 ): SpellResult {
   for (const t of texts) world.events.push({ type: 'floatText', ...t });
-  return { kind, spell, hits: [], blockedIds: [], pushedIds: [], scoreGained: 0, combo: world.combo, cooldownLeft: 0, texts, perfect: false, ...extra };
+  return { kind, spell, hits: [], blockedIds: [], pushedIds: [], scoreGained: 0, combo: world.combo, cooldownLeft: 0, texts, perfect: false, impactPos: null, ...extra };
 }

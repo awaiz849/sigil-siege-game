@@ -7,7 +7,7 @@ import type { Enemy, World } from '../src/game/types.ts';
 import { createWorld, startRound, takeEvents, update } from '../src/game/world.ts';
 import { castleMaxHp } from '../src/game/difficulty.ts';
 import { spawnEnemy, updateEnemies, warlockStopZ } from '../src/game/enemies.ts';
-import { TEXT, castShield, castSpell, castSpellOn, counterShape, pickTarget } from '../src/game/spells.ts';
+import { TEXT, castMeteor, castShield, castSpell, castSpellOn, counterShape, pickTarget } from '../src/game/spells.ts';
 import { pushApart } from '../src/game/crowd.ts';
 import { formatRoundLog, noteStrokeStart } from '../src/game/roundLog.ts';
 
@@ -505,6 +505,69 @@ check('castle HP hard 100', createWorld('hard').castleHp === 100);
   const old = fresh();
   const i4 = spawnEnemy(old, 'imp', 'fire', 0);
   check('no quality given: no bonus', !castSpell(old, 'C', fakeProject(i4), fakeProject).perfect);
+}
+
+// ---- METEOR ultimate: meter from kills + perfect sigils, full meter + throw = area blast ----
+{
+  const MT = CONFIG.METEOR;
+
+  // Charging: kills and perfect sigils fill the meter (capped).
+  const c = fresh();
+  const bird = spawnEnemy(c, 'bird', 'nature', 0);
+  castSpell(c, 'L', fakeProject(bird), fakeProject); // plain kill
+  check('kill charges meter', c.ultimate === MT.perKill, String(c.ultimate));
+  const bird2 = spawnEnemy(c, 'bird', 'nature', 0);
+  castSpell(c, 'L', fakeProject(bird2), fakeProject, 1); // perfect kill
+  check('perfect kill charges both', c.ultimate === 2 * MT.perKill + MT.perPerfect, String(c.ultimate));
+  c.ultimate = MT.meterMax - 1;
+  const bird3 = spawnEnemy(c, 'bird', 'nature', 0);
+  castSpell(c, 'L', fakeProject(bird3), fakeProject);
+  check('meter capped', c.ultimate === MT.meterMax);
+
+  // Not full: nothing happens, no penalty.
+  const nf = fresh();
+  const imp = spawnEnemy(nf, 'imp', 'fire', 0);
+  nf.ultimate = 60;
+  nf.combo = 3;
+  const r0 = castMeteor(nf, fakeProject(imp), fakeProject);
+  check('meteor not ready', r0.kind === 'charging' && r0.texts[0].text === TEXT.meteorCharging(60) && imp.hp === CONFIG.IMP.hp && nf.combo === 3 && nf.ultimate === 60);
+
+  // Full: lands on the nearest monster, hits everything in the radius, empties the meter.
+  const w = fresh();
+  const a = spawnEnemy(w, 'imp', 'fire', 0);
+  const near = spawnEnemy(w, 'warlock', 'water', 0);
+  const boss = spawnEnemy(w, 'boss', 'nature', 0);
+  const far = spawnEnemy(w, 'imp', 'nature', 0);
+  a.pos.z = -20;
+  near.pos = { x: MT.radius - 1, y: 0, z: -20 };
+  boss.pos = { x: -2, y: 0, z: -22 };
+  far.pos = { x: 0, y: 0, z: -20 - MT.radius - 2 };
+  w.ultimate = MT.meterMax;
+  const r = castMeteor(w, fakeProject(a), fakeProject);
+  check('meteor fires', r.spell === 'meteor' && r.kind === 'kill' && w.ultimate === 0);
+  check('meteor impact at target', r.impactPos !== null && r.impactPos.x === 0 && r.impactPos.z === -20);
+  check('meteor hits everything in radius', r.hits.length === 3 && !r.hits.some((h) => h.enemyId === far.id), JSON.stringify(r.hits.map((h) => h.enemyId)));
+  check('meteor damage, no element', near.hp === CONFIG.WARLOCK.hp - MT.damage && boss.hp === CONFIG.BOSS.hp - MT.damage);
+  check('meteor kills the imp', !w.enemies.includes(a));
+  check('outside radius untouched', far.hp === CONFIG.IMP.hp);
+  check('meteor kill does not recharge', w.ultimate === 0);
+  check('meteor text', r.texts[0].text === TEXT.meteor);
+
+  // Stunned enemies still take x2.
+  const st = fresh();
+  const sw = spawnEnemy(st, 'boss', 'fire', 0);
+  sw.stunT = 1;
+  st.ultimate = MT.meterMax;
+  castMeteor(st, fakeProject(sw), fakeProject);
+  check('meteor x2 on stunned', sw.hp === CONFIG.BOSS.hp - 2 * MT.damage);
+
+  // Nothing to aim at: ignored, meter kept (an accidental throw doesn't waste it).
+  const em = fresh();
+  em.ultimate = MT.meterMax;
+  check('meteor with no monsters ignored', castMeteor(em, { x: 0, y: 0 }, fakeProject).kind === 'ignored' && em.ultimate === MT.meterMax);
+  const menu = createWorld('normal', 1);
+  menu.ultimate = MT.meterMax;
+  check('meteor in menu ignored', castMeteor(menu, { x: 0, y: 0 }, fakeProject).kind === 'ignored');
 }
 
 if (failures > 0) throw new Error(`${failures} rule checks failed (${passes} passed)`);

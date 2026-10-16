@@ -24,6 +24,7 @@ export function createWorld(difficulty: Difficulty = 'normal', seed: number = Da
     lightningCooldown: 0,
     windCooldown: 0,
     mana: CONFIG.MANA.max,
+    ultimate: 0,
     enemies: [],
     nextEnemyId: 1,
     waveDamaged: false,
