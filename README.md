@@ -92,4 +92,7 @@ webcam -> MediaPipe HandLandmarker -> One Euro filter -> finger poses -> stroke
 - **Vite** and **TypeScript** for the build.
 - **AI assistance**: Claude and Claude Code were used for planning and coding help.
 
-Team Velocity: Vasi (input, recognition, 3D world, UI, sound) and Awaiz (gameplay logic).
+Team Velocity:
+- Vasi: input, recognition, 3D world, UI, sound
+- Awaiz: gameplay logic
+- Farhan: demo and presentation
