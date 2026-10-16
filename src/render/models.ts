@@ -39,7 +39,7 @@ function elementMaterials(element: Element) {
 }
 
 function tintedStone(element: Element): THREE.Color {
-  return new THREE.Color(PALETTE.stone).lerp(new THREE.Color(ELEMENT_COLOR[element]), 0.28).multiplyScalar(0.85);
+  return new THREE.Color(0x8a8780).lerp(new THREE.Color(ELEMENT_COLOR[element]), 0.45).multiplyScalar(0.8);
 }
 
 function box(w: number, h: number, d: number, mat: THREE.Material): THREE.Mesh {
