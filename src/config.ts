@@ -141,8 +141,8 @@ export const CONFIG = {
   MUSIC_VOLUME: 0.45,
   /** Soft wind under the music (filtered noise). Kept low: loud, it sounds like a hiss in the menus. 0 = off. */
   MUSIC_WIND: 0.04,
-  /** Music tempo per intensity level: 0 menu, 1 wave 1, 2 wave 2, 3 wave 3, 4 boss. */
-  MUSIC_BPM: [0, 72, 84, 96, 112],
+  /** Music tempo per intensity level: 0 menu (calm), 1 wave 1, 2 wave 2, 3 wave 3, 4 boss. */
+  MUSIC_BPM: [80, 92, 100, 108, 118],
 
   // ---- Screens ----
   /** Hand check: each pose must be held this long to pass. */
