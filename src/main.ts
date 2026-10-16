@@ -11,6 +11,7 @@ import { loadFonts } from './ui/fonts.ts';
 import { createScreens, type CameraState } from './ui/screens.ts';
 import { playCast, playEvents } from './audio/sound.ts';
 import { setMusicIntensity, updateMusic } from './audio/music.ts';
+import { callout } from './audio/voice.ts';
 import { createMouseInput } from './input/mouseInput.ts';
 import { createHandInput, type HandInput } from './input/handInput.ts';
 import { onPalm, onStrokeEnd, onStrokeStart } from './events.ts';
@@ -165,6 +166,8 @@ function showCast(result: SpellResult, from?: { x: number; y: number }) {
   if (result.spell === 'lightning' && result.hits.length > 0) world3d.lightningFlash();
   overlay.worldUi.handleCast(result, view, performance.now());
   playCast(result);
+  // The wizard shouts the spell's name when it works.
+  if (result.spell && ['hit', 'kill', 'push', 'block'].includes(result.kind)) callout(result.spell[0].toUpperCase() + result.spell.slice(1) + '!');
 }
 
 /** Game events: camera shake on castle hits, round log at game over; the overlay shows the rest. */
