@@ -138,14 +138,17 @@ function handleEvents() {
   }
 }
 
-/** A3 tuning: print the round log and keep the last 20 in localStorage ("sigil-siege-round-logs"). */
+/** A3 tuning: print the round log, keep the last 20 in localStorage ("sigil-siege-round-logs"),
+ *  and under `npm run dev` also append it to logs/round-logs.txt (see vite.config.ts). */
 function saveRoundLog(report: string) {
   console.log(report);
+  const entry = `${new Date().toISOString()}
+${report}`;
+  if (import.meta.env.DEV) fetch('/__round-log', { method: 'POST', body: entry }).catch(() => {});
   try {
     const key = 'sigil-siege-round-logs';
     const logs: string[] = JSON.parse(localStorage.getItem(key) ?? '[]');
-    logs.push(`${new Date().toISOString()}
-${report}`);
+    logs.push(entry);
     localStorage.setItem(key, JSON.stringify(logs.slice(-20)));
   } catch {
     // Storage blocked: the console copy is enough.
