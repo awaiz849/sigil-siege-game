@@ -110,4 +110,8 @@ export const CONFIG = {
   /** Cap on devicePixelRatio; lower it if 3D stutters with tracking. */
   MAX_PIXEL_RATIO: 1.5,
   SHADOWS: false,
+  /** Glow on emissive things. Turn off first if FPS drops (after shadows). */
+  BLOOM: { enabled: true, strength: 0.9, radius: 0.55, threshold: 0.8 },
+  /** First-person camera on the wall. back = metres behind the wall's front face (negative = leaning over). */
+  CAMERA: { fov: 55, eyeHeight: 2.2, back: 1.8, lookAtY: 1.5, lookAtZ: -22, crenelHalfWidth: 1.35 },
 };

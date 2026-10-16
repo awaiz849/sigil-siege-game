@@ -1,5 +1,6 @@
 // Entry point: creates the two canvases (3D below, 2D overlay on top) and runs the frame loop.
 import { createScene } from './render/scene.ts';
+import { createDemoWorld } from './render/demoWorld.ts';
 import { createOverlay } from './ui/overlay.ts';
 import { createDebugOverlay } from './ui/debugOverlay.ts';
 import { createMouseInput } from './input/mouseInput.ts';
@@ -16,6 +17,8 @@ document.body.append(glCanvas, overlayCanvas);
 const world3d = createScene(glCanvas);
 const overlay = createOverlay(overlayCanvas);
 const debugOverlay = createDebugOverlay();
+// Temporary until integration: real game logic with a stand-in spawner.
+const demo = createDemoWorld();
 
 function resize() {
   const w = window.innerWidth;
@@ -78,9 +81,13 @@ onStrokeEnd((points) => {
 });
 onPalm(() => overlay.flash('SHIELD'));
 
+let lastNow = 0;
 function frame(now: number) {
+  const dt = lastNow ? Math.min(0.1, (now - lastNow) / 1000) : 0;
+  lastNow = now;
   hand?.update();
-  world3d.render();
+  demo.update(dt);
+  world3d.render(demo.world, dt);
   overlay.draw();
   debugOverlay.tick(now);
   debugOverlay.draw(overlay.ctx, hand);
