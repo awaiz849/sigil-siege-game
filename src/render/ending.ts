@@ -12,6 +12,7 @@ import { createEnemyModel, type EnemyModel } from './models.ts';
 import { whenGlbLoaded } from './glbModels.ts';
 import { WALL_TOP } from './environment.ts';
 import { toon } from './toon.ts';
+import { createFireworks } from './fireworks.ts';
 import { PALETTE } from './palette.ts';
 
 type Particles = { burst(at: THREE.Vector3, color: number, count: number, speed?: number, up?: number, lifetime?: number): void };
@@ -27,7 +28,6 @@ type Refs = {
   shake: (amount: number) => void;
 };
 
-const FIREWORK_COLORS = [0xffd86a, 0xff5a2e, 0x3fa9ff, 0x6fe05a, 0xff7ad8, 0xffffff];
 
 export function createEnding(refs: Refs) {
   let mode: 'win' | 'lose' | null = null;
@@ -37,6 +37,7 @@ export function createEnding(refs: Refs) {
   // Saved transforms, restored when the next round starts.
   const saved = [refs.wall, ...refs.towers, refs.hero].map((o) => ({ o, pos: o.position.clone(), rot: o.rotation.clone() }));
   const extras = new THREE.Group(); // banners, rubble, cinematic boss
+  const fireworks = createFireworks(refs.scene);
   refs.scene.add(extras);
   const rubble: Array<{ m: THREE.Mesh; v: THREE.Vector3; spin: THREE.Vector3 }> = [];
   let boss: { model: EnemyModel; enemy: Enemy } | null = null;
@@ -78,6 +79,7 @@ export function createEnding(refs: Refs) {
 
   function reset() {
     mode = null;
+    fireworks.clear();
     for (const s of saved) {
       s.o.position.copy(s.pos);
       s.o.rotation.copy(s.rot);
@@ -144,6 +146,7 @@ export function createEnding(refs: Refs) {
         if (mode) reset();
         if (want) start(want, world, camPos, camLook);
       }
+      fireworks.update(dt);
       if (!mode) return null;
       t += dt;
 
@@ -160,11 +163,9 @@ export function createEnding(refs: Refs) {
         banners.forEach((b, i) => (b.scale.y = Math.max(0.001, THREE.MathUtils.smoothstep(t, 1.4 + i * 0.25, 2.2 + i * 0.25))));
         fireworkT -= dt;
         if (t > 1.2 && fireworkT <= 0) {
-          fireworkT = 0.22 + Math.random() * 0.25;
-          const at = new THREE.Vector3((Math.random() - 0.5) * 28, WALL_TOP + 7 + Math.random() * 8, CONFIG.FIELD.wallZ - 2 + Math.random() * 4);
-          const color = FIREWORK_COLORS[Math.floor(Math.random() * FIREWORK_COLORS.length)];
-          refs.particles.burst(at, color, 45, 7, 0.5, 1.3);
-          refs.particles.burst(at, 0xffffff, 10, 3, 0.5, 0.5);
+          // Rockets launch from along the castle wall and burst over it.
+          fireworkT = 0.3 + Math.random() * 0.35;
+          fireworks.launch(new THREE.Vector3((Math.random() - 0.5) * 24, WALL_TOP + 1, CONFIG.FIELD.wallZ - 1));
         }
         castT -= dt;
         if (castT <= 0) {
