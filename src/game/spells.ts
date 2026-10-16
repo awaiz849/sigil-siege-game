@@ -148,7 +148,7 @@ export function castSpellOn(world: World, shape: string | null, targetId: number
   if (world.phase !== 'PLAYING') return result(world, 'ignored', null);
   const r = castShape(world, shape, targetId);
   if (quality >= CONFIG.PERFECT_SIGIL.minScore) rewardPerfect(world, r);
-  logCast(world, shape, r.kind); // tuning log: pen down -> cast time
+  logCast(world, shape, r.kind, quality, r.spell); // round log: timing, end-screen stats and graph
   return r;
 }
 
@@ -398,6 +398,7 @@ function damageEnemy(world: World, enemy: Enemy, spellElement: Element | null, b
     hit.score = CONFIG.KILL_SCORE * world.combo;
     world.score += hit.score;
     world.combo = Math.min(CONFIG.MAX_COMBO, world.combo + 1);
+    world.stats.bestCombo = Math.max(world.stats.bestCombo, world.combo);
     world.stats.kills++;
     world.log.killsByWave[world.wave - 1]++;
     if (chargesUltimate) chargeUltimate(world, CONFIG.METEOR.perKill);

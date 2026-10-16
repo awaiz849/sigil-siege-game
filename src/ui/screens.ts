@@ -3,7 +3,9 @@
 //   title      hover a difficulty button 0.8 s to pick it, hold palm 1.2 s (or hover START) to start
 //   tutorial   how to draw every sigil (tutorial.ts); runs before the very first round, HOW TO PLAY replays it
 //   pause      RESUME / RESTART / EXIT TO MENU; hold palm to resume
-//   end        victory / defeat, score + stats, PLAY AGAIN / CHANGE DIFFICULTY, hold palm to play again
+//   name       a top-5 score: pick 3 initials by hovering letters (or click / type), OK or hold palm
+//   end        victory / defeat: score + top-5 board, round stats (accuracy, favourite spell, best combo,
+//              perfect sigils, recognition score of every stroke as a graph), PLAY AGAIN / CHANGE DIFFICULTY
 // Everything works hands-free (dwell.ts buttons + palmHold.ts). Mouse clicks and keys work too:
 //   click a button; title: 1/2/3 or arrows pick, Enter/Space starts; in game: Esc/P pauses;
 //   pause: Esc/P/Enter resumes; end: Enter plays again, Esc goes to the menu.
@@ -18,8 +20,10 @@ import { drawHandPreview } from './debugOverlay.ts';
 import { FONT_TEXT, FONT_TITLE } from './fonts.ts';
 import { drawPalm, drawSigil, ELEMENT_CSS, GOLD, NAVY, roundRect } from './icons.ts';
 import { createTutorial, tutorialDone } from './tutorial.ts';
+import { qualifies, saveScore, topScores, type Entry } from './highScores.ts';
+import { roundStats, type RoundStats } from '../game/roundLog.ts';
 
-export type ScreenName = 'handCheck' | 'title' | 'tutorial' | 'pause' | 'end';
+export type ScreenName = 'handCheck' | 'title' | 'tutorial' | 'pause' | 'name' | 'end';
 export type CameraState = 'loading' | 'ready' | 'failed';
 
 type Opts = {
@@ -37,6 +41,11 @@ type Opts = {
 };
 
 const DIFFICULTIES: Difficulty[] = ['easy', 'normal', 'hard'];
+/** Spell name colours for the end-screen "favourite spell". */
+const SPELL_CSS_END: Record<string, string> = {
+  water: '#3fa9ff', fire: '#ff5a2e', nature: '#6fe05a', lightning: '#cfe6ff', wind: '#b8f0d8', shield: '#9fe6ff',
+  frost: '#9fe0ff', flame: '#ff6a2a', thorn: '#6fe05a', arcane: '#c9a0ff', timewarp: '#b8a0ff', tome: '#ffd86a', meteor: '#ff8a3a',
+};
 const BEST_KEY = 'sigil-siege-best';
 /** Best scores are kept per difficulty, and separately for level 2 (the wizard keeps the old keys). */
 const bestKey = (d: Difficulty, hero: Hero) => (hero === 'wizard' ? d : `${hero}:${d}`);
@@ -48,6 +57,9 @@ export function createScreens(opts: Opts) {
   let hero: Hero = 'wizard';
   let endWorld: World | null = null;
   let newBest = false;
+  let endStats: RoundStats | null = null;
+  let endRank = -1; // place on the top-5 board (-1 = not on it)
+  let initials = '';
   let shownAt = performance.now();
 
   // ---- hand check state
@@ -55,7 +67,16 @@ export function createScreens(opts: Opts) {
   let step = 0; // 0 = show palm, 1 = point, 2 = done
   let heldS = 0;
   let lastNow = performance.now();
-  onCursor((_x, _y, p) => (pose = p));
+  // Name entry: the letter keys only listen once the hand has moved after the screen opened,
+  // so a cursor resting where a key appears doesn't type it.
+  let nameArmed = false;
+  let armFrom: { x: number; y: number } | null = null;
+  onCursor((x, y, p) => {
+    pose = p;
+    if (screen !== 'name' || nameArmed) return;
+    armFrom ??= { x, y };
+    if (Math.hypot(x - armFrom.x, y - armFrom.y) > 40) nameArmed = true;
+  });
 
   // ---- layout (recomputed from the canvas size every frame)
   let W = 1280;
@@ -176,12 +197,17 @@ export function createScreens(opts: Opts) {
     makeButton(() => screen === 'pause', () => stackRect(2, H * 0.38), 'EXIT TO MENU', exitToMenu),
   ];
   const endButtons = [
-    makeButton(() => screen === 'end', () => stackRect(0, H * 0.72), 'PLAY AGAIN', start),
-    makeButton(() => screen === 'end', () => stackRect(1, H * 0.72), 'CHANGE DIFFICULTY', () => {
+    makeButton(() => screen === 'end', () => endButtonRect(0), 'PLAY AGAIN', start),
+    makeButton(() => screen === 'end', () => endButtonRect(1), 'CHANGE DIFFICULTY', () => {
       sound.select();
       show('title');
     }),
   ];
+  // Name entry: A-Z, delete and OK, hovered (shorter dwell), clicked or typed.
+  const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  const nameKeys = [...LETTERS, 'DEL', 'OK'].map((k, i) =>
+    makeButton(() => screen === 'name' && nameArmed, () => keyRect(i), k === 'DEL' ? '<' : k, () => typeKey(k), CONFIG.NAME_HOVER_S),
+  );
   const howToButton = makeButton(() => screen === 'title', cornerRect, 'HOW TO PLAY', () => openTutorial(false));
   const tutorialButtons = [
     makeButton(() => screen === 'tutorial' && !tutorial.onReadyPage, cornerRect, 'SKIP TUTORIAL', () => tutorial.skipAll()),
@@ -190,7 +216,43 @@ export function createScreens(opts: Opts) {
   ];
   // In game: a longer hover, so aiming near the corner never pauses by accident.
   const pauseGameButton = makeButton(() => screen === null && opts.playing(), pauseRect, 'II  PAUSE', pause, CONFIG.PAUSE_HOVER_S);
-  const allButtons = [...difficultyButtons, ...levelButtons, startButton, howToButton, ...tutorialButtons, ...pauseButtons, ...endButtons, pauseGameButton];
+  const allButtons = [...difficultyButtons, ...levelButtons, startButton, howToButton, ...tutorialButtons, ...pauseButtons, ...endButtons, ...nameKeys, pauseGameButton];
+
+  // ---- end screen layout: two cards side by side, prompt and buttons under them
+  const cardTop = () => H * 0.26;
+  const cardH = () => 270 * scale();
+  function endButtonRect(i: number): Rect {
+    const s = scale();
+    const bw = 300 * s;
+    const gap = 24 * s;
+    return { x: W / 2 - bw - gap / 2 + i * (bw + gap), y: cardTop() + cardH() + 78 * s, w: bw, h: 52 * s };
+  }
+  /** Letter keys for the name entry: 7 columns x 4 rows. */
+  function keyRect(i: number): Rect {
+    const s = scale();
+    const kw = 70 * s;
+    const kh = 54 * s;
+    const gap = 10 * s;
+    const col = i % 7;
+    const row = Math.floor(i / 7);
+    return { x: W / 2 - (7 * kw + 6 * gap) / 2 + col * (kw + gap), y: H * 0.42 + row * (kh + gap), w: kw, h: kh };
+  }
+  function typeKey(k: string) {
+    if (k === 'OK') return saveName();
+    sound.select();
+    if (k === 'DEL') initials = initials.slice(0, -1);
+    else if (initials.length < 3) initials += k;
+  }
+  function saveName() {
+    const w = endWorld;
+    if (!w) return;
+    const name = initials || (w.hero === 'wizard' ? 'WIZ' : 'GWD');
+    endRank = saveScore(w.hero, w.difficulty, name, w.score);
+    sound.start();
+    screen = 'end';
+    shownAt = performance.now();
+    palmHold.reset();
+  }
 
   // Mouse: a left click on a live button presses it (overlay pixels = CSS pixels).
   window.addEventListener('click', (e) => {
@@ -224,6 +286,11 @@ export function createScreens(opts: Opts) {
       else if (e.key === 'ArrowDown') pickHero('warden');
       else if (confirm) start();
       else return;
+    } else if (screen === 'name') {
+      if (/^[a-z]$/i.test(e.key)) typeKey(e.key.toUpperCase());
+      else if (e.key === 'Backspace') typeKey('DEL');
+      else if (e.key === 'Enter') saveName();
+      else return;
     } else if (screen === 'pause' && (back || confirm)) resume();
     else if (screen === 'end' && confirm) start();
     else if (screen === 'end' && e.key === 'Escape') show('title');
@@ -241,6 +308,7 @@ export function createScreens(opts: Opts) {
     if (screen === 'title' || screen === 'end') start();
     else if (screen === 'pause') resume();
     else if (screen === 'tutorial' && tutorial.onReadyPage) finishTutorial();
+    else if (screen === 'name') saveName();
   });
 
   function show(name: ScreenName, world?: World) {
@@ -250,6 +318,15 @@ export function createScreens(opts: Opts) {
     if (name === 'end' && world) {
       endWorld = world;
       newBest = saveBest(world);
+      endStats = roundStats(world);
+      endRank = -1;
+      // A top-5 score: pick your initials first.
+      if (qualifies(topScores(world.hero, world.difficulty), world.score)) {
+        initials = '';
+        nameArmed = false;
+        armFrom = null;
+        screen = 'name';
+      }
     }
   }
 
@@ -269,10 +346,11 @@ export function createScreens(opts: Opts) {
   }
 
   function bestScore(d: Difficulty): number {
+    const top = topScores(hero, d)[0]?.score ?? 0;
     try {
-      return (JSON.parse(localStorage.getItem(BEST_KEY) ?? '{}') as Record<string, number>)[bestKey(d, hero)] ?? 0;
+      return Math.max(top, (JSON.parse(localStorage.getItem(BEST_KEY) ?? '{}') as Record<string, number>)[bestKey(d, hero)] ?? 0);
     } catch {
-      return 0;
+      return top;
     }
   }
 
@@ -334,6 +412,7 @@ export function createScreens(opts: Opts) {
       else if (screen === 'title') drawTitle(ctx, s, now);
       else if (screen === 'tutorial') drawTutorial(ctx, s, now);
       else if (screen === 'pause') drawPause(ctx, s, now);
+      else if (screen === 'name') drawName(ctx, s, now);
       else drawEnd(ctx, s, now);
       ctx.restore();
     },
@@ -498,52 +577,154 @@ export function createScreens(opts: Opts) {
     const w = endWorld;
     if (!w) return;
     const won = w.phase === 'WIN';
-    const pop = 1 + Math.max(0, 0.3 - (now - shownAt) / 1000) ;
-    title(ctx, won ? 'VICTORY!' : 'THE WALL FELL', H * 0.17, 80 * s * pop, won ? GOLD : '#ff6a5a');
+    const pop = 1 + Math.max(0, 0.3 - (now - shownAt) / 1000);
+    title(ctx, won ? 'VICTORY!' : 'THE WALL FELL', H * 0.12, 72 * s * pop, won ? GOLD : '#ff6a5a');
     ctx.font = `${18 * s}px ${FONT_TEXT}`;
     ctx.fillStyle = '#e8e2ff';
-    ctx.fillText(won ? (w.bossDefeated ? 'You defeated the boss!' : 'You held the wall for the whole siege!') : 'The castle has fallen... try again!', W / 2, H * 0.27);
+    ctx.fillText(won ? (w.bossDefeated ? 'You defeated the boss!' : 'You held the wall for the whole siege!') : 'The castle has fallen... try again!', W / 2, H * 0.2);
 
-    // Score card.
-    const cw = 460 * s;
-    const ch = 200 * s;
-    const cx = W / 2 - cw / 2;
-    const cy = H * 0.33;
-    roundRect(ctx, cx, cy, cw, ch, 14 * s);
+    const cw = 455 * s;
+    const ch = cardH();
+    const cy = cardTop();
+    const left = W / 2 - cw - 15 * s;
+    const right = W / 2 + 15 * s;
+    card(ctx, left, cy, cw, ch, s);
+    card(ctx, right, cy, cw, ch, s);
+
+    // ---- left card: score + top 5
+    const lx = left + cw / 2;
+    ctx.font = `${14 * s}px ${FONT_TITLE}`;
+    ctx.fillStyle = '#e8e2ff';
+    ctx.fillText('SCORE', lx, cy + 24 * s);
+    ctx.font = `700 ${44 * s}px ${FONT_TITLE}`;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(w.score.toLocaleString('en-US'), lx, cy + 60 * s);
+    if ((newBest || endRank === 0) && Math.floor(now / 400) % 2 === 0) {
+      ctx.font = `700 ${14 * s}px ${FONT_TITLE}`;
+      ctx.fillStyle = GOLD;
+      ctx.fillText('NEW BEST!', lx, cy + 88 * s);
+    }
+    ctx.font = `${12 * s}px ${FONT_TITLE}`;
+    ctx.fillStyle = '#b8b0d8';
+    ctx.fillText(`TOP 5 · ${w.difficulty.toUpperCase()} · ${w.hero === 'wizard' ? 'WIZARD' : 'GRAND WARDEN'}`, lx, cy + 112 * s);
+    const board: Entry[] = topScores(w.hero, w.difficulty);
+    for (let i = 0; i < 5; i++) {
+      const y = cy + (136 + i * 26) * s;
+      const e = board[i];
+      const mine = i === endRank;
+      ctx.font = `${16 * s}px ${FONT_TITLE}`;
+      ctx.fillStyle = mine ? GOLD : e ? '#ffffff' : 'rgba(255,255,255,0.3)';
+      ctx.textAlign = 'left';
+      ctx.fillText(`${i + 1}.  ${e ? e.name : '---'}`, left + 70 * s, y);
+      ctx.textAlign = 'right';
+      ctx.fillText(e ? e.score.toLocaleString('en-US') : '', left + cw - 70 * s, y);
+    }
+    ctx.textAlign = 'center';
+
+    // ---- right card: round stats + recognition graph
+    const st = endStats;
+    if (st) {
+      const fav = st.favourite;
+      const cells: Array<[string, string, string]> = [
+        ['ACCURACY', `${Math.round(st.accuracy * 100)}%`, st.accuracy >= 0.7 ? '#6fe05a' : st.accuracy >= 0.4 ? GOLD : '#ff8a7a'],
+        ['FAVOURITE', fav ? fav.toUpperCase() : '-', fav ? SPELL_CSS_END[fav] ?? '#ffffff' : '#ffffff'],
+        ['BEST COMBO', `x${st.bestCombo}`, GOLD],
+        ['PERFECT', String(st.perfects), '#ffd86a'],
+        ['KILLS', String(w.stats.kills), '#ffffff'],
+        ['TIME', `${Math.floor(w.time)} s`, '#ffffff'],
+      ];
+      cells.forEach(([k, v, color], i) => {
+        const x = right + (cw / 3) * ((i % 3) + 0.5);
+        const y = cy + (i < 3 ? 26 : 80) * s;
+        ctx.font = `${11 * s}px ${FONT_TITLE}`;
+        ctx.fillStyle = '#b8b0d8';
+        ctx.fillText(k, x, y);
+        ctx.font = `700 ${18 * s}px ${FONT_TITLE}`;
+        ctx.fillStyle = color;
+        ctx.fillText(v, x, y + 24 * s);
+      });
+      drawScoreGraph(ctx, st, right + 24 * s, cy + 140 * s, cw - 48 * s, ch - 160 * s, s);
+    }
+
+    const py = cy + ch + 34 * s;
+    confirmPrompt(ctx, s, now, py, 'TO PLAY AGAIN', 'or press ENTER');
+    endButtons.forEach((b, i) => drawButton(ctx, b, i === 0, s, 18));
+  }
+
+  /** Bars: recognizer score of every stroke (green = it worked, gold = perfect, red = missed / fizzled),
+   *  with the dashed recognition threshold. */
+  function drawScoreGraph(ctx: CanvasRenderingContext2D, st: RoundStats, x: number, y: number, gw: number, gh: number, s: number) {
+    ctx.font = `${11 * s}px ${FONT_TITLE}`;
+    ctx.fillStyle = '#b8b0d8';
+    ctx.fillText('RECOGNITION SCORE PER STROKE', x + gw / 2, y - 8 * s);
+    const top = y + 8 * s;
+    const h = gh - 10 * s;
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+    ctx.fillRect(x, top, gw, h);
+    const n = st.scores.length;
+    if (n === 0) {
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.fillText('no strokes drawn', x + gw / 2, top + h / 2);
+      return;
+    }
+    const slot = gw / n;
+    const bw = Math.max(1, Math.min(14 * s, slot * 0.7));
+    st.scores.forEach((p, i) => {
+      const bh = Math.max(2, p.score * h);
+      ctx.fillStyle = !p.worked ? '#ff6a5a' : p.score >= CONFIG.PERFECT_SIGIL.minScore ? '#ffd86a' : '#6fe05a';
+      ctx.fillRect(x + slot * (i + 0.5) - bw / 2, top + h - bh, bw, bh);
+    });
+    // Threshold line: below it a shape isn't recognized.
+    const ty = top + h - CONFIG.RECOGNIZER_THRESHOLD * h;
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.setLineDash([4 * s, 4 * s]);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, ty);
+    ctx.lineTo(x + gw, ty);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.fillText(String(CONFIG.RECOGNIZER_THRESHOLD), x + 3 * s, ty - 7 * s);
+    ctx.textAlign = 'center';
+  }
+
+  function card(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, s: number) {
+    roundRect(ctx, x, y, w, h, 14 * s);
     ctx.fillStyle = 'rgba(13,11,36,0.72)'; // see-through: the victory / defeat scene shows behind it
     ctx.fill();
     ctx.strokeStyle = GOLD;
     ctx.lineWidth = 2 * s;
     ctx.stroke();
-    ctx.font = `${16 * s}px ${FONT_TITLE}`;
-    ctx.fillStyle = '#e8e2ff';
-    ctx.fillText('SCORE', W / 2, cy + 30 * s);
-    ctx.font = `700 ${54 * s}px ${FONT_TITLE}`;
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(w.score.toLocaleString('en-US'), W / 2, cy + 74 * s);
-    if (newBest && Math.floor(now / 400) % 2 === 0) {
-      ctx.font = `700 ${16 * s}px ${FONT_TITLE}`;
-      ctx.fillStyle = GOLD;
-      ctx.fillText('NEW BEST!', W / 2, cy + 108 * s);
-    }
-    const stats = [
-      ['KILLS', String(w.stats.kills)],
-      ['CASTLE', `${Math.ceil(w.castleHp)} HP`],
-      ['TIME', `${Math.floor(w.time)} s`],
-      ['MODE', w.difficulty.toUpperCase()],
-    ];
-    stats.forEach(([k, v], i) => {
-      const x = cx + (cw / 4) * (i + 0.5);
-      ctx.font = `${12 * s}px ${FONT_TITLE}`;
-      ctx.fillStyle = '#b8b0d8';
-      ctx.fillText(k, x, cy + 145 * s);
-      ctx.font = `${18 * s}px ${FONT_TITLE}`;
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(v, x, cy + 172 * s);
-    });
+  }
 
-    confirmPrompt(ctx, s, now, H * 0.62, 'TO PLAY AGAIN', 'or press ENTER');
-    endButtons.forEach((b, i) => drawButton(ctx, b, i === 0, s));
+  // ---------------------------------------------------------------- name entry
+
+  function drawName(ctx: CanvasRenderingContext2D, s: number, now: number) {
+    const w = endWorld;
+    if (!w) return;
+    title(ctx, 'NEW HIGH SCORE!', H * 0.12, 60 * s, GOLD);
+    ctx.font = `700 ${34 * s}px ${FONT_TITLE}`;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(w.score.toLocaleString('en-US'), W / 2, H * 0.21);
+    // Three initial slots.
+    for (let i = 0; i < 3; i++) {
+      const x = W / 2 + (i - 1) * 64 * s;
+      const y = H * 0.31;
+      roundRect(ctx, x - 26 * s, y - 30 * s, 52 * s, 60 * s, 8 * s);
+      ctx.fillStyle = 'rgba(13,11,36,0.85)';
+      ctx.fill();
+      ctx.strokeStyle = i === initials.length && Math.floor(now / 300) % 2 === 0 ? '#ffffff' : GOLD;
+      ctx.lineWidth = 2 * s;
+      ctx.stroke();
+      ctx.font = `700 ${34 * s}px ${FONT_TITLE}`;
+      ctx.fillStyle = GOLD;
+      ctx.fillText(initials[i] ?? '', x, y + 2 * s);
+    }
+    // Always drawn in place (they only start listening once the hand moves).
+    nameKeys.forEach((b, i) => button(ctx, keyRect(i), b.label, i === nameKeys.length - 1, b.dwell.progress, s, undefined, 20));
+    confirmPrompt(ctx, s, now, H * 0.42 + 4 * 64 * s + 30 * s, 'TO SAVE', 'hover letters, click, or type · ENTER saves');
   }
 
   // ---------------------------------------------------------------- widgets

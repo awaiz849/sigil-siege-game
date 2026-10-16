@@ -55,6 +55,8 @@ export const CONFIG = {
   /** Hold times for hands-free menus. */
   PALM_HOLD_START_S: 1.2,
   HOVER_SELECT_S: 0.8,
+  /** High-score name entry: hover a letter this long to type it (shorter than other buttons). */
+  NAME_HOVER_S: 0.6,
   /** In-game pause button: longer hover, so aiming near the corner never pauses by accident. */
   PAUSE_HOVER_S: 1.2,
 

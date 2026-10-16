@@ -9,7 +9,7 @@ import { castleMaxHp } from '../src/game/difficulty.ts';
 import { spawnEnemy, updateEnemies, warlockStopZ } from '../src/game/enemies.ts';
 import { TEXT, castMeteor, castShield, castSpell, castSpellOn, counterShape, pickTarget } from '../src/game/spells.ts';
 import { pushApart } from '../src/game/crowd.ts';
-import { formatRoundLog, noteStrokeStart } from '../src/game/roundLog.ts';
+import { formatRoundLog, noteStrokeStart, roundStats } from '../src/game/roundLog.ts';
 
 let failures = 0;
 let passes = 0;
@@ -451,6 +451,25 @@ check('castle HP hard 100', createWorld('hard').castleHp === 100);
   check('tome: castle takes no damage', tm.castleHp === hpBefore);
   check('tome on cooldown', castShield(tm).kind === 'cooldown');
   check('counter-shape hint uses the warden shapes', counterShape('fire', 'warden') === 'U' && counterShape('fire') === 'C');
+}
+
+// ---- End-screen stats: accuracy, favourite spell, best combo, score per stroke ----
+{
+  const w = fresh();
+  const a = spawnEnemy(w, 'imp', 'fire', -3);
+  const b = spawnEnemy(w, 'imp', 'fire', 3);
+  const stroke = (shape: string | null, target: Enemy | null, q: number) => {
+    noteStrokeStart(w);
+    castSpellOn(w, shape, target ? target.id : null, q);
+  };
+  stroke('C', a, 0.9); // water on fire: kill (2 dmg on 2 hp)
+  stroke('C', b, 0.85); // kill
+  stroke(null, null, 0.4); // fizzle
+  stroke('C', null, 0.88); // miss
+  const st = roundStats(w);
+  check('stats: 4 strokes, 50% accuracy', st.strokes === 4 && near(st.accuracy, 0.5), JSON.stringify(st));
+  check('stats: favourite = water, best combo 3', st.favourite === 'water' && st.bestCombo === 3);
+  check('stats: one score per stroke', st.scores.length === 4 && st.scores[0].worked && !st.scores[2].worked && near(st.scores[0].score, 0.9));
 }
 
 // ---- Targeting: nearest enemy on SCREEN to the stroke centre ----

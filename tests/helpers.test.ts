@@ -3,6 +3,7 @@
 import { emitCursor } from '../src/events.ts';
 import { createDwell } from '../src/input/dwell.ts';
 import { createPalmHold } from '../src/input/palmHold.ts';
+import { insertEntry, qualifies } from '../src/ui/highScores.ts';
 
 let failures = 0;
 const check = (ok: boolean, label: string) => {
@@ -57,6 +58,20 @@ const check = (ok: boolean, label: string) => {
   hold.update(5000);
   check(held === 1, 'fires once per hold');
   hold.dispose();
+}
+
+// ---- High-score board: top 5, highest first, ties keep the older entry first
+{
+  let board = [] as Array<{ name: string; score: number }>;
+  for (const [name, score] of [['AAA', 500], ['BBB', 900], ['CCC', 700], ['DDD', 300], ['EEE', 100]] as const) {
+    board = insertEntry(board, { name, score }).board;
+  }
+  check(board.map((e) => e.score).join() === '900,700,500,300,100', 'board sorted high to low');
+  const tie = insertEntry(board, { name: 'TIE', score: 700 });
+  check(tie.rank === 2 && tie.board[1].name === 'CCC' && tie.board.length === 5, 'tie goes under the older score');
+  check(!tie.board.some((e) => e.name === 'EEE'), 'bottom score drops off');
+  check(insertEntry(board, { name: 'LOW', score: 50 }).rank === -1, 'too low = not on the board');
+  check(qualifies(board, 150) && !qualifies(board, 100) && !qualifies([], 0) && qualifies([], 10), 'qualifies: beats the 5th');
 }
 
 if (failures > 0) throw new Error(`${failures} helper checks failed`);

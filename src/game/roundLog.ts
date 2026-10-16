@@ -13,6 +13,10 @@ export interface StrokeLog {
   shape: string | null;
   /** SpellResult kind: hit, kill, block, miss, fizzle, cooldown. */
   result: string;
+  /** Recognizer score 0..1 (how cleanly the shape was drawn), for the end-screen graph. */
+  score: number;
+  /** The spell it cast (null = fizzle). */
+  spell: string | null;
 }
 
 export interface RoundLog {
@@ -44,10 +48,10 @@ export function noteStrokeStart(world: World): void {
 }
 
 /** Called by spells.ts after every cast that came from a stroke. */
-export function logCast(world: World, shape: string | null, result: string): void {
+export function logCast(world: World, shape: string | null, result: string, score = 0, spell: string | null = null): void {
   const start = world.log.penDownAt;
   if (start === null) return; // no pen-down seen (e.g. shield from an open palm)
-  world.log.strokes.push({ penDownAt: start, seconds: world.time - start, shape, result });
+  world.log.strokes.push({ penDownAt: start, seconds: world.time - start, shape, result, score, spell });
   world.log.penDownAt = null;
 }
 
@@ -79,4 +83,32 @@ export function formatRoundLog(world: World): string {
     `enemies on field per second: avg ${avg(perSecond).toFixed(1)}, max ${Math.max(0, ...perSecond)} (cap ${CONFIG.DIFFICULTY[log.difficulty].maxEnemies})`,
     ...rows,
   ].join('\n');
+}
+
+/** End-screen numbers for a finished round (judges love numbers). accuracy = strokes that did
+ *  something / strokes that tried (cooldowns and NO MANA don't count as tries). */
+export interface RoundStats {
+  strokes: number;
+  accuracy: number;
+  favourite: string | null;
+  bestCombo: number;
+  perfects: number;
+  /** Recognizer score of every stroke in order (0 = not recognized), for the graph. */
+  scores: Array<{ score: number; worked: boolean }>;
+}
+
+export function roundStats(world: World): RoundStats {
+  const tries = world.log.strokes.filter((s) => s.result !== 'cooldown' && s.result !== 'nomana' && s.result !== 'ignored');
+  const worked = (r: string) => r === 'hit' || r === 'kill' || r === 'push' || r === 'block';
+  const counts: Record<string, number> = {};
+  for (const s of tries) if (s.spell) counts[s.spell] = (counts[s.spell] ?? 0) + 1;
+  const favourite = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  return {
+    strokes: tries.length,
+    accuracy: tries.length ? tries.filter((s) => worked(s.result)).length / tries.length : 0,
+    favourite,
+    bestCombo: world.stats.bestCombo,
+    perfects: world.stats.perfects,
+    scores: tries.map((s) => ({ score: s.result === 'fizzle' ? Math.min(s.score, CONFIG.RECOGNIZER_THRESHOLD) : s.score, worked: worked(s.result) })),
+  };
 }
