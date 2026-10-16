@@ -186,7 +186,7 @@ export const sound = {
 export function playCast(r: SpellResult) {
   if (r.kind === 'ignored') return;
   if (r.kind === 'fizzle') return sound.fizzle();
-  if (r.kind === 'cooldown') return sound.cooldown();
+  if (r.kind === 'cooldown' || r.kind === 'nomana') return sound.cooldown();
   if (r.spell === 'water') sound.water();
   else if (r.spell === 'fire') sound.fire();
   else if (r.spell === 'nature') sound.nature();

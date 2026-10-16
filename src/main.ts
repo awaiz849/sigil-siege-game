@@ -147,7 +147,7 @@ function showCast(result: SpellResult, from?: { x: number; y: number }) {
       else burst();
     }
   }
-  if (color !== undefined && result.kind !== 'fizzle' && result.kind !== 'cooldown') world3d.wizardCast(color);
+  if (color !== undefined && result.kind !== 'fizzle' && result.kind !== 'cooldown' && result.kind !== 'nomana') world3d.wizardCast(color);
   if (result.spell === 'lightning' && result.hits.length > 0) world3d.lightningFlash();
   overlay.worldUi.handleCast(result, view, performance.now());
   playCast(result);

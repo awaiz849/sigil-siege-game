@@ -94,7 +94,7 @@ export function createWorldUi() {
 
     /** The sigil you just drew flares in the spell's colour (or crumbles on a fizzle). */
     burnStroke(result: SpellResult, now: number) {
-      if (lastStroke.length < 2 || result.kind === 'ignored') return;
+      if (lastStroke.length < 2 || result.kind === 'ignored' || result.kind === 'nomana') return;
       const fizzle = result.kind === 'fizzle';
       const color = fizzle ? '#b06060' : SPELL_CSS[result.spell ?? ''] ?? '#ffffff';
       burn = { points: lastStroke, color, born: now, fizzle };

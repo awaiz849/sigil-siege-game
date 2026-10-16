@@ -349,6 +349,41 @@ check('castle HP hard 100', createWorld('hard').castleHp === 100);
   check('damaged wave gets no bonus', hurt.score === 0 && hurt.wave === 2, `score ${hurt.score}`);
 }
 
+// ---- Mana: every cast costs mana, the right element refunds some, empty = NO MANA ----
+{
+  const M = CONFIG.MANA;
+  const w = fresh();
+  check('mana starts full', w.mana === M.max);
+  const imp = spawnEnemy(w, 'imp', 'nature', 0);
+  imp.hp = 10;
+  cast(w, 'C', imp); // water on nature: normal hit
+  check('cast costs mana', w.mana === M.max - M.cost.water, String(w.mana));
+  cast(w, 'L', imp); // fire on nature: super effective, part refunded
+  check('super effective refunds', w.mana === M.max - M.cost.water - M.cost.fire + M.strongRefund, String(w.mana));
+
+  w.mana = M.cost.water - 1;
+  w.combo = 3;
+  const hpBefore = imp.hp;
+  const r = cast(w, 'C', imp);
+  check('not enough mana = nomana', r.kind === 'nomana' && r.texts[0].text === TEXT.noMana);
+  check('nomana: no damage, no mana spent, combo kept', imp.hp === hpBefore && w.mana === M.cost.water - 1 && w.combo === 3);
+
+  w.mana = 50;
+  cast(w, null, imp);
+  check('fizzle costs a little', w.mana === 50 - M.fizzle);
+  w.mana = 50;
+  castShield(w);
+  check('shield with nothing to block costs nothing', w.mana === 50);
+
+  // Refill: manaRegen per second (Normal), capped at max.
+  const regen = fresh();
+  regen.mana = 0;
+  for (let i = 0; i < 60; i++) update(regen, 1 / 60);
+  check('mana refills per second', Math.abs(regen.mana - CONFIG.DIFFICULTY.normal.manaRegen) < 0.5, String(regen.mana));
+  for (let i = 0; i < 1200; i++) update(regen, 1 / 60);
+  check('mana capped at max', regen.mana === M.max);
+}
+
 // ---- Targeting: nearest enemy on SCREEN to the stroke centre ----
 {
   const w = fresh();

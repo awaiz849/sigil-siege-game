@@ -112,6 +112,8 @@ export interface World {
   lightningCooldown: number;
   /** Seconds until wind can be cast again (0 = ready). */
   windCooldown: number;
+  /** Mana for casting, 0..MANA.max; refills every second (see CONFIG.MANA). */
+  mana: number;
   enemies: Enemy[];
   nextEnemyId: number;
   /** Castle took damage during the current wave (no clean-wave bonus). */

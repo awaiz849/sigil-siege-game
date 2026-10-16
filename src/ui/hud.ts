@@ -1,9 +1,9 @@
 // Fixed HUD on the overlay canvas:
-//   top-left   castle HP bar
+//   top-left   castle HP bar, mana bar under it
 //   top-centre round timer + wave
 //   top-right  score + combo
 //   bottom-left spellbook: each sigil drawn as a real shape, what it casts, what it beats,
-//               lightning cooldown, and the palm = shield reminder
+//               its mana cost, lightning / wind cooldown, and the palm = shield reminder
 import { CONFIG } from '../config.ts';
 import type { World } from '../game/types.ts';
 import { castleMaxHp } from '../game/difficulty.ts';
@@ -22,6 +22,7 @@ export function drawHud(ctx: CanvasRenderingContext2D, world: World, now: number
   ctx.save();
   ctx.textBaseline = 'middle';
   drawCastleHp(ctx, world, s, now);
+  drawMana(ctx, world, s, now);
   drawClock(ctx, world, s, w);
   drawScore(ctx, world, s, w);
   drawSpellbook(ctx, world, s, h);
@@ -77,6 +78,35 @@ function drawCastleHp(ctx: CanvasRenderingContext2D, world: World, s: number, no
   for (let k = 1; k < 10; k++) ctx.fillRect(bx + (bw * k) / 10 - 1, by, 2, bh);
 }
 
+const MANA_BLUE = '#5fb4ff';
+
+/** Mana bar: blue, fills as it regenerates; blinks when even the cheapest spell can't be paid. */
+function drawMana(ctx: CanvasRenderingContext2D, world: World, s: number, now: number) {
+  const x = 16 * s;
+  const y = 80 * s;
+  const pw = 300 * s;
+  const ph = 34 * s;
+  panel(ctx, x, y, pw, ph, s);
+  const frac = Math.max(0, world.mana / CONFIG.MANA.max);
+  const cheapest = Math.min(CONFIG.MANA.cost.water, CONFIG.MANA.cost.fire, CONFIG.MANA.cost.nature);
+  const empty = world.mana < cheapest;
+  ctx.font = `${13 * s}px ${FONT_TITLE}`;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = empty && Math.floor(now / 250) % 2 === 0 ? '#ff6a5a' : MANA_BLUE;
+  ctx.fillText('MANA', x + 14 * s, y + ph / 2 + 1 * s);
+  const bx = x + 70 * s;
+  const bw = pw - 84 * s;
+  const by = y + 11 * s;
+  const bh = 12 * s;
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  ctx.fillRect(bx, by, bw, bh);
+  ctx.fillStyle = MANA_BLUE;
+  ctx.fillRect(bx, by, bw * frac, bh);
+  // A tick at every cheap-spell's worth, so you can count casts left.
+  ctx.fillStyle = 'rgba(13,11,36,0.7)';
+  for (let k = cheapest; k < CONFIG.MANA.max; k += cheapest) ctx.fillRect(bx + (bw * k) / CONFIG.MANA.max - 1, by, 2, bh);
+}
+
 function drawClock(ctx: CanvasRenderingContext2D, world: World, s: number, w: number) {
   const left = Math.max(0, CONFIG.ROUND_SECONDS - world.time);
   const m = Math.floor(left / 60);
@@ -126,15 +156,16 @@ function drawScore(ctx: CanvasRenderingContext2D, world: World, s: number, w: nu
   ctx.fillText(`x${c}`, cx, cy + 1 * s);
 }
 
-type Row = { shape: SigilShape | 'palm'; name: string; color: string; beats?: keyof typeof ELEMENT_CSS; self?: keyof typeof ELEMENT_CSS };
+type Row = { shape: SigilShape | 'palm'; name: string; color: string; cost: number; beats?: keyof typeof ELEMENT_CSS; self?: keyof typeof ELEMENT_CSS };
 
+const COST = CONFIG.MANA.cost;
 const ROWS: Row[] = [
-  { shape: 'C', name: 'WATER', color: ELEMENT_CSS.water, self: 'water', beats: 'fire' },
-  { shape: 'L', name: 'FIRE', color: ELEMENT_CSS.fire, self: 'fire', beats: 'nature' },
-  { shape: 'v', name: 'NATURE', color: ELEMENT_CSS.nature, self: 'nature', beats: 'water' },
-  { shape: 'zigzag', name: 'LIGHTNING', color: '#cfe6ff' },
-  { shape: 'line', name: 'WIND', color: '#b8f0d8' },
-  { shape: 'palm', name: 'SHIELD', color: '#9fe6ff' },
+  { shape: 'C', name: 'WATER', color: ELEMENT_CSS.water, cost: COST.water, self: 'water', beats: 'fire' },
+  { shape: 'L', name: 'FIRE', color: ELEMENT_CSS.fire, cost: COST.fire, self: 'fire', beats: 'nature' },
+  { shape: 'v', name: 'NATURE', color: ELEMENT_CSS.nature, cost: COST.nature, self: 'nature', beats: 'water' },
+  { shape: 'zigzag', name: 'LIGHTNING', color: '#cfe6ff', cost: COST.lightning },
+  { shape: 'line', name: 'WIND', color: '#b8f0d8', cost: COST.wind },
+  { shape: 'palm', name: 'SHIELD', color: '#9fe6ff', cost: COST.shield },
 ];
 
 /** Cooldown of a row's spell: seconds left and the full cooldown (lightning and wind only). */
@@ -146,7 +177,7 @@ function cooldownOf(row: Row, world: World): { left: number; total: number } | n
 
 function drawSpellbook(ctx: CanvasRenderingContext2D, world: World, s: number, h: number) {
   const rowH = 30 * s;
-  const pw = 250 * s;
+  const pw = 286 * s;
   const ph = rowH * ROWS.length + 20 * s;
   const x = 16 * s;
   const y = h - ph - 16 * s;
@@ -156,7 +187,7 @@ function drawSpellbook(ctx: CanvasRenderingContext2D, world: World, s: number, h
     const cy = y + 10 * s + rowH * i + rowH / 2;
     const sx = x + 24 * s;
     const cooldown = cooldownOf(row, world);
-    const ready = !cooldown || cooldown.left <= 0;
+    const ready = (!cooldown || cooldown.left <= 0) && world.mana >= row.cost;
     ctx.globalAlpha = ready ? 1 : 0.45;
 
     if (row.shape === 'palm') drawPalm(ctx, sx, cy, 20 * s, row.color);
@@ -180,10 +211,15 @@ function drawSpellbook(ctx: CanvasRenderingContext2D, world: World, s: number, h
     } else {
       ctx.fillText('open palm', x + 150 * s, cy + 1 * s);
     }
+    // Mana cost, right-aligned in mana blue.
+    ctx.textAlign = 'right';
+    ctx.font = `${13 * s}px ${FONT_TITLE}`;
+    ctx.fillStyle = MANA_BLUE;
+    ctx.fillText(String(row.cost), x + pw - 12 * s, cy + 1 * s);
     ctx.globalAlpha = 1;
 
     // Lightning / wind cooldown: a ring that refills + seconds left.
-    if (cooldown && !ready) {
+    if (cooldown && cooldown.left > 0) {
       const frac = cooldown.left / cooldown.total;
       const rx = x + 190 * s;
       ctx.strokeStyle = 'rgba(207,230,255,0.25)';

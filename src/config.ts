@@ -62,6 +62,16 @@ export const CONFIG = {
   CLEAN_WAVE_BONUS: 500,
 
   // ---- Spells ----
+  /** Mana stops spell spam: every cast costs mana, mana refills over time (per difficulty, see
+   *  DIFFICULTY.manaRegen). A SUPER EFFECTIVE hit refunds strongRefund, so the right element is cheap
+   *  and spamming wrong ones runs dry. Not enough mana = "NO MANA", nothing happens (no combo penalty).
+   *  The shield only costs mana when it actually blocks; a fizzle (shape not recognized) costs a little. */
+  MANA: {
+    max: 100,
+    cost: { water: 20, fire: 20, nature: 20, lightning: 40, wind: 30, shield: 15 },
+    strongRefund: 12,
+    fizzle: 6,
+  },
   LIGHTNING_COOLDOWN_S: 10,
   SHIELD_STUN_S: 3,
   /** WIND (drawn line): pushes walking enemies this many units back, then a cooldown. */
@@ -82,13 +92,13 @@ export const CONFIG = {
 
   // ---- Difficulty ----
   /** speed / spawnInterval = multipliers on the Normal numbers, maxEnemies = cap on the field,
-   *  castleHp = castle hit points, wallDamage = damage when a monster reaches the wall
+   *  castleHp = castle hit points, manaRegen = mana refilled per second, wallDamage = damage when a monster reaches the wall
    *  (the boss deals it again every BOSS.smashS while it stands at the wall). */
   DIFFICULTY: {
-    easy: { speed: 0.75, spawnInterval: 1.3, maxEnemies: 5, castleHp: 200, wallDamage: { imp: 5, bird: 5, warlock: 10, boss: 20 } },
-    normal: { speed: 1, spawnInterval: 1, maxEnemies: 7, castleHp: 150, wallDamage: { imp: 10, bird: 10, warlock: 10, boss: 20 } },
-    hard: { speed: 1.5, spawnInterval: 0.8, maxEnemies: 9, castleHp: 100, wallDamage: { imp: 10, bird: 10, warlock: 10, boss: 20 } },
-  } as Record<Difficulty, { speed: number; spawnInterval: number; maxEnemies: number; castleHp: number; wallDamage: Record<'imp' | 'bird' | 'warlock' | 'boss', number> }>,
+    easy: { speed: 0.75, spawnInterval: 1.3, maxEnemies: 5, castleHp: 200, manaRegen: 16, wallDamage: { imp: 5, bird: 5, warlock: 10, boss: 20 } },
+    normal: { speed: 1, spawnInterval: 1, maxEnemies: 7, castleHp: 150, manaRegen: 12, wallDamage: { imp: 10, bird: 10, warlock: 10, boss: 20 } },
+    hard: { speed: 1.5, spawnInterval: 0.8, maxEnemies: 9, castleHp: 100, manaRegen: 10, wallDamage: { imp: 10, bird: 10, warlock: 10, boss: 20 } },
+  } as Record<Difficulty, { speed: number; spawnInterval: number; maxEnemies: number; castleHp: number; manaRegen: number; wallDamage: Record<'imp' | 'bird' | 'warlock' | 'boss', number> }>,
 
   // ---- Game logic: field, spawning, crowd (src/game) ----
   /** Longest frame step the logic accepts (s); a bigger gap (tab switch) is clamped. */

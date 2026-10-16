@@ -23,6 +23,7 @@ export function createWorld(difficulty: Difficulty = 'normal', seed: number = Da
     combo: 1,
     lightningCooldown: 0,
     windCooldown: 0,
+    mana: CONFIG.MANA.max,
     enemies: [],
     nextEnemyId: 1,
     waveDamaged: false,
@@ -87,6 +88,7 @@ export function update(world: World, dt: number): void {
   world.time += dt;
   world.lightningCooldown = Math.max(0, world.lightningCooldown - dt);
   world.windCooldown = Math.max(0, world.windCooldown - dt);
+  world.mana = Math.min(CONFIG.MANA.max, world.mana + CONFIG.DIFFICULTY[world.difficulty].manaRegen * dt);
   updateWave(world);
   updateSpawns(world);
   updateEnemies(world, dt);

@@ -30,6 +30,7 @@ export const TEXT = {
   fizzle: 'FIZZLE',
   blocked: 'BLOCKED!',
   wind: 'WIND!',
+  noMana: 'NO MANA',
   cooldown: (spell: SpellName, seconds: number) => `${spell.toUpperCase()} ${Math.ceil(seconds)}s`,
   kill: (score: number) => `+${score}`,
 };
@@ -56,8 +57,8 @@ export interface SpellResult {
   /** hit = damage only, kill = at least one kill, block = shield stopped warlocks,
    *  miss = no target / nothing to block, fizzle = shape not recognized,
    *  push = wind pushed enemies back, cooldown = lightning / wind not ready (no penalty),
-   *  ignored = not in a round. */
-  kind: 'hit' | 'kill' | 'block' | 'push' | 'miss' | 'fizzle' | 'cooldown' | 'ignored';
+   *  nomana = not enough mana (nothing happens, no penalty), ignored = not in a round. */
+  kind: 'hit' | 'kill' | 'block' | 'push' | 'miss' | 'fizzle' | 'cooldown' | 'nomana' | 'ignored';
   spell: SpellName | null;
   hits: Hit[];
   /** Warlocks the shield blocked. */
@@ -112,14 +113,27 @@ export function castSpellOn(world: World, shape: string | null, targetId: number
 
 function castShape(world: World, shape: string | null, targetId: number | null): SpellResult {
   const spell = shape ? SIGIL_SPELLS[shape] : undefined;
-  if (!spell) return fail(world, 'fizzle', null);
+  if (!spell) {
+    world.mana = Math.max(0, world.mana - CONFIG.MANA.fizzle);
+    return fail(world, 'fizzle', null);
+  }
   if (spell === 'shield') return castShield(world);
   if (spell === 'lightning') return castLightning(world);
   if (spell === 'wind') return castWind(world);
 
+  if (world.mana < CONFIG.MANA.cost[spell]) return noMana(world, spell);
+  world.mana -= CONFIG.MANA.cost[spell];
   const target = world.enemies.find((e) => e.id === targetId);
-  if (!target) return fail(world, 'miss', spell);
-  return finish(world, spell, [damageEnemy(world, target, spell)]);
+  if (!target) return fail(world, 'miss', spell); // the mana is spent anyway
+  const hit = damageEnemy(world, target, spell);
+  // The right element pays back part of its cost.
+  if (hit.effect === 'strong') world.mana = Math.min(CONFIG.MANA.max, world.mana + CONFIG.MANA.strongRefund);
+  return finish(world, spell, [hit]);
+}
+
+/** Not enough mana: nothing happens, no combo penalty. */
+function noMana(world: World, spell: SpellName): SpellResult {
+  return result(world, 'nomana', spell, {}, [{ text: TEXT.noMana, pos: null, tone: 'info' }]);
 }
 
 /** Lightning: 1 damage to every enemy, then a cooldown. Casting on cooldown costs nothing. */
@@ -131,6 +145,8 @@ function castLightning(world: World): SpellResult {
     ]);
   }
   if (world.enemies.length === 0) return fail(world, 'miss', 'lightning');
+  if (world.mana < CONFIG.MANA.cost.lightning) return noMana(world, 'lightning');
+  world.mana -= CONFIG.MANA.cost.lightning;
   world.lightningCooldown = CONFIG.LIGHTNING_COOLDOWN_S;
   // Copy the list: killed enemies are removed while we loop.
   const hits = world.enemies.slice().map((e) => damageEnemy(world, e, null));
@@ -148,6 +164,8 @@ function castWind(world: World): SpellResult {
   }
   const pushed = world.enemies.filter((e) => e.type !== 'boss' && e.state === 'walk');
   if (pushed.length === 0) return fail(world, 'miss', 'wind');
+  if (world.mana < CONFIG.MANA.cost.wind) return noMana(world, 'wind');
+  world.mana -= CONFIG.MANA.cost.wind;
   world.windCooldown = CONFIG.WIND_COOLDOWN_S;
   for (const e of pushed) e.pos.z = Math.max(CONFIG.FIELD.spawnZ, e.pos.z - CONFIG.WIND_PUSH);
   return result(world, 'push', 'wind', { pushedIds: pushed.map((e) => e.id) }, [
@@ -160,6 +178,8 @@ export function castShield(world: World): SpellResult {
   if (world.phase !== 'PLAYING') return result(world, 'ignored', 'shield');
   const charging = world.enemies.filter((e) => e.type === 'warlock' && e.state === 'charge' && e.stunT === 0);
   if (charging.length === 0) return fail(world, 'miss', 'shield');
+  if (world.mana < CONFIG.MANA.cost.shield) return noMana(world, 'shield');
+  world.mana -= CONFIG.MANA.cost.shield;
   for (const warlock of charging) {
     // The charge is lost: after the stun it waits a full recharge before charging again.
     warlock.state = 'recharge';
