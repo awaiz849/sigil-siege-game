@@ -22,9 +22,10 @@ No keyboard, mouse or touch is needed at any point, including the menus, startin
 | Sigil | Spell | Effect |
 |---|---|---|
 | ○ circle | Water | Hits one enemy, beats Fire |
-| △ triangle | Fire | Hits one enemy, beats Nature |
+| L | Fire | Hits one enemy, beats Nature |
 | V | Nature | Hits one enemy, beats Water |
 | W zigzag | Lightning | 1 damage to every enemy, 10 s cooldown |
+| — straight line | Wind | Pushes every walking enemy back, 12 s cooldown |
 | open palm | Shield | Blocks every charging warlock and stuns it for 3 s |
 
 The target is the enemy closest to the centre of your sigil (a gold ring shows it while you draw).

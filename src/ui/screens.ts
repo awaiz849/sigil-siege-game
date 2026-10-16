@@ -261,7 +261,7 @@ export function createScreens(opts: Opts) {
     // A row of glowing sigils that "draw themselves" in a loop.
     const sig = [
       { shape: 'circle' as const, color: ELEMENT_CSS.water },
-      { shape: 'triangle' as const, color: ELEMENT_CSS.fire },
+      { shape: 'L' as const, color: ELEMENT_CSS.fire },
       { shape: 'v' as const, color: ELEMENT_CSS.nature },
       { shape: 'zigzag' as const, color: '#cfe6ff' },
     ];

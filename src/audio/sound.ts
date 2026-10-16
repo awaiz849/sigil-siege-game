@@ -97,6 +97,11 @@ export const sound = {
     noise('lowpass', 300, 60, 1.0, 0.5, 0.05);
     tone('sawtooth', 80, 40, 0.8, 0.15, 0.05);
   },
+  wind() {
+    // Rising whoosh: band-passed noise sweeping up, plus a soft low rush.
+    noise('bandpass', 300, 1800, 0.6, 0.35, 0, 1.5);
+    noise('lowpass', 500, 150, 0.7, 0.2, 0.05);
+  },
   shield() {
     // Metallic ping (inharmonic partials) + whoosh.
     tone('sine', 1200, 1150, 0.6, 0.18);
@@ -180,6 +185,7 @@ export function playCast(r: SpellResult) {
   else if (r.spell === 'fire') sound.fire();
   else if (r.spell === 'nature') sound.nature();
   else if (r.spell === 'lightning') sound.lightning();
+  else if (r.spell === 'wind') sound.wind();
   else if (r.spell === 'shield') sound.shield();
   if (r.kind === 'miss') return sound.miss();
   if (r.hits.some((h) => h.effect === 'strong')) sound.superEffective();

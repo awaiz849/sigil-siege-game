@@ -126,11 +126,19 @@ type Row = { shape: SigilShape | 'palm'; name: string; color: string; beats?: ke
 
 const ROWS: Row[] = [
   { shape: 'circle', name: 'WATER', color: ELEMENT_CSS.water, self: 'water', beats: 'fire' },
-  { shape: 'triangle', name: 'FIRE', color: ELEMENT_CSS.fire, self: 'fire', beats: 'nature' },
+  { shape: 'L', name: 'FIRE', color: ELEMENT_CSS.fire, self: 'fire', beats: 'nature' },
   { shape: 'v', name: 'NATURE', color: ELEMENT_CSS.nature, self: 'nature', beats: 'water' },
   { shape: 'zigzag', name: 'LIGHTNING', color: '#cfe6ff' },
+  { shape: 'line', name: 'WIND', color: '#b8f0d8' },
   { shape: 'palm', name: 'SHIELD', color: '#9fe6ff' },
 ];
+
+/** Cooldown of a row's spell: seconds left and the full cooldown (lightning and wind only). */
+function cooldownOf(row: Row, world: World): { left: number; total: number } | null {
+  if (row.shape === 'zigzag') return { left: world.lightningCooldown, total: CONFIG.LIGHTNING_COOLDOWN_S };
+  if (row.shape === 'line') return { left: world.windCooldown, total: CONFIG.WIND_COOLDOWN_S };
+  return null;
+}
 
 function drawSpellbook(ctx: CanvasRenderingContext2D, world: World, s: number, h: number) {
   const rowH = 30 * s;
@@ -143,7 +151,8 @@ function drawSpellbook(ctx: CanvasRenderingContext2D, world: World, s: number, h
   ROWS.forEach((row, i) => {
     const cy = y + 10 * s + rowH * i + rowH / 2;
     const sx = x + 24 * s;
-    const ready = row.shape !== 'zigzag' || world.lightningCooldown <= 0;
+    const cooldown = cooldownOf(row, world);
+    const ready = !cooldown || cooldown.left <= 0;
     ctx.globalAlpha = ready ? 1 : 0.45;
 
     if (row.shape === 'palm') drawPalm(ctx, sx, cy, 20 * s, row.color);
@@ -162,14 +171,16 @@ function drawSpellbook(ctx: CanvasRenderingContext2D, world: World, s: number, h
       drawElementIcon(ctx, row.beats, x + 214 * s, cy, 18 * s);
     } else if (row.shape === 'zigzag') {
       ctx.fillText(ready ? 'hits all' : '', x + 150 * s, cy + 1 * s);
+    } else if (row.shape === 'line') {
+      ctx.fillText(ready ? 'push back' : '', x + 150 * s, cy + 1 * s);
     } else {
       ctx.fillText('open palm', x + 150 * s, cy + 1 * s);
     }
     ctx.globalAlpha = 1;
 
-    // Lightning cooldown: a ring that refills + seconds left.
-    if (row.shape === 'zigzag' && !ready) {
-      const frac = world.lightningCooldown / CONFIG.LIGHTNING_COOLDOWN_S;
+    // Lightning / wind cooldown: a ring that refills + seconds left.
+    if (cooldown && !ready) {
+      const frac = cooldown.left / cooldown.total;
       const rx = x + 190 * s;
       ctx.strokeStyle = 'rgba(207,230,255,0.25)';
       ctx.lineWidth = 3 * s;
@@ -183,7 +194,7 @@ function drawSpellbook(ctx: CanvasRenderingContext2D, world: World, s: number, h
       ctx.font = `${13 * s}px ${FONT_TITLE}`;
       ctx.fillStyle = '#cfe6ff';
       ctx.textAlign = 'left';
-      ctx.fillText(`${Math.ceil(world.lightningCooldown)}s`, rx + 16 * s, cy + 1 * s);
+      ctx.fillText(`${Math.ceil(cooldown.left)}s`, rx + 16 * s, cy + 1 * s);
     }
   });
 }

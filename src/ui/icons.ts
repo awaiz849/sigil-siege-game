@@ -1,5 +1,5 @@
 // Canvas drawings shared by the HUD, badges and hints:
-//   element icons (flame / drop / leaf) and sigil shapes (circle / triangle / V / W zigzag / line).
+//   element icons (flame / drop / leaf) and sigil shapes (circle / L / V / W zigzag / line).
 // Icons are distinct SHAPES, not just colours: the flame has three tongues and a flat base so it
 // never reads as a drop; the drop is round at the bottom with one point at the top.
 import type { Element } from '../game/types.ts';
@@ -77,7 +77,7 @@ export function drawElementIcon(ctx: CanvasRenderingContext2D, element: Element,
   ctx.restore();
 }
 
-export type SigilShape = 'circle' | 'triangle' | 'v' | 'zigzag' | 'line';
+export type SigilShape = 'circle' | 'L' | 'v' | 'zigzag' | 'line';
 
 /** Sigil outline centred on (x, y) inside a `size` box. Lightning is always a W, never a Z. */
 export function drawSigil(ctx: CanvasRenderingContext2D, shape: SigilShape, x: number, y: number, size: number, color: string, lineWidth = 3) {
@@ -92,11 +92,10 @@ export function drawSigil(ctx: CanvasRenderingContext2D, shape: SigilShape, x: n
     case 'circle':
       ctx.arc(x, y, h * 0.85, 0, Math.PI * 2);
       break;
-    case 'triangle':
-      ctx.moveTo(x, y - h * 0.9);
-      ctx.lineTo(x + h * 0.9, y + h * 0.7);
-      ctx.lineTo(x - h * 0.9, y + h * 0.7);
-      ctx.closePath();
+    case 'L':
+      ctx.moveTo(x - h * 0.5, y - h * 0.9);
+      ctx.lineTo(x - h * 0.5, y + h * 0.8);
+      ctx.lineTo(x + h * 0.7, y + h * 0.8);
       break;
     case 'v':
       ctx.moveTo(x - h * 0.7, y - h * 0.8);
@@ -122,7 +121,7 @@ export function drawSigil(ctx: CanvasRenderingContext2D, shape: SigilShape, x: n
 /** The sigil that beats each element (for the wave-1 hints above enemies). */
 export const COUNTER_SIGIL: Record<Element, SigilShape> = {
   fire: 'circle', // water beats fire
-  nature: 'triangle', // fire beats nature
+  nature: 'L', // fire beats nature
   water: 'v', // nature beats water
 };
 

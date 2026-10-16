@@ -26,7 +26,7 @@ export type EnemyType = 'imp' | 'bird' | 'warlock' | 'boss';
 export type EnemyState = 'walk' | 'charge' | 'recharge';
 /** MENU = title / difficulty screen (nothing moves), PLAYING = round running, WIN / LOSE = end banner. */
 export type Phase = 'MENU' | 'PLAYING' | 'WIN' | 'LOSE';
-export type SpellName = 'water' | 'fire' | 'nature' | 'lightning' | 'shield';
+export type SpellName = 'water' | 'fire' | 'nature' | 'lightning' | 'wind' | 'shield';
 
 /** World units, three.js axes: x = sideways, y = height, z = depth (negative = out in the field). */
 export interface Vec3 {
@@ -109,6 +109,8 @@ export interface World {
   combo: number;
   /** Seconds until lightning can be cast again (0 = ready). */
   lightningCooldown: number;
+  /** Seconds until wind can be cast again (0 = ready). */
+  windCooldown: number;
   enemies: Enemy[];
   nextEnemyId: number;
   /** Castle took damage during the current wave (no clean-wave bonus). */

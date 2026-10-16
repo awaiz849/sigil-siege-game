@@ -1,6 +1,6 @@
 // Cheap geometric checks run BEFORE $1:
 //  - an almost-straight stroke is a line ($1 cannot handle lines: it scales them into a square)
-//  - otherwise: is the stroke closed (circle/triangle) or open (v/zigzag)?
+//  - otherwise: is the stroke closed (circle) or open (v / zigzag / L)?
 import { CONFIG } from '../config.ts';
 import type { Point } from '../events.ts';
 import { dist, pathLength } from './dollar.ts';

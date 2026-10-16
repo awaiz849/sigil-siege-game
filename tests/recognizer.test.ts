@@ -49,16 +49,21 @@ function circle(startDeg: number, clockwise: boolean, sweepDeg = 360): Point[] {
   return pts;
 }
 
-const T = { x: 0, y: -1 }, R = { x: 0.87, y: 0.5 }, L = { x: -0.87, y: 0.5 };
+/** L corners: top of the upright, the corner, end of the foot. */
+const TOP = { x: 0, y: -1 }, CORNER = { x: 0, y: 1 }, FOOT = { x: 1.2, y: 1 };
 
 const cases: Array<[string, Point[]]> = [];
 for (let k = 0; k < 6; k++) {
   cases.push(['circle', humanize(circle(between(0, 360), true))]);
   cases.push(['circle', humanize(circle(between(0, 360), false))]);
   cases.push(['circle', humanize(circle(-90, true, 320))]); // left a gap
-  cases.push(['triangle', humanize([T, R, L, T])]);
-  cases.push(['triangle', humanize([T, L, R, T])]);
-  cases.push(['triangle', humanize([L, T, R, L])]); // started bottom-left
+  cases.push(['circle', humanize(circle(between(0, 360), false, 265))]); // big gap
+  cases.push(['circle', humanize(circle(between(0, 360), true, 460))]); // went round too far
+  cases.push(['circle', humanize(circle(between(0, 360), true, 330), { noise: 0.1 })]); // shaky + gap
+  cases.push(['L', humanize([TOP, CORNER, FOOT])]);
+  cases.push(['L', humanize([TOP, CORNER, { x: 0.5, y: 1 }])]); // short foot
+  cases.push(['L', humanize([TOP, CORNER, { x: 2, y: 1 }])]); // long foot
+  cases.push(['L', humanize([FOOT, CORNER, TOP])]); // drawn backwards
   cases.push(['v', humanize([{ x: -0.6, y: -1 }, { x: 0, y: 1 }, { x: 0.6, y: -1 }])]);
   cases.push(['v', humanize([{ x: -0.3, y: -1 }, { x: 0, y: 1 }, { x: 0.3, y: -1 }])]); // narrow
   cases.push(['v', humanize([{ x: -1.2, y: -1 }, { x: 0, y: 1 }, { x: 1.2, y: -1 }])]); // wide

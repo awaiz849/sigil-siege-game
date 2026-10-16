@@ -54,6 +54,9 @@ export const CONFIG = {
   // ---- Spells ----
   LIGHTNING_COOLDOWN_S: 10,
   SHIELD_STUN_S: 3,
+  /** WIND (drawn line): pushes walking enemies this many units back, then a cooldown. */
+  WIND_PUSH: 6,
+  WIND_COOLDOWN_S: 12,
   DMG_BASE: 1,
   DMG_STRONG: 2,
   DMG_WEAK: 0.5,

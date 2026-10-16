@@ -43,8 +43,8 @@ function runEnemies(world: World, seconds: number): void {
     ['circle', 'fire', 2], // water beats fire
     ['circle', 'water', 0.5], // same element
     ['circle', 'nature', 1],
-    ['triangle', 'nature', 2], // fire beats nature
-    ['triangle', 'fire', 0.5],
+    ['L', 'nature', 2], // fire beats nature
+    ['L', 'fire', 0.5],
     ['v', 'water', 2], // nature beats water
     ['v', 'nature', 0.5],
   ];
@@ -75,7 +75,7 @@ function runEnemies(world: World, seconds: number): void {
   const scores: number[] = [];
   for (let i = 0; i < 7; i++) {
     const bird = spawnEnemy(w, 'bird', 'nature', 0); // 1 HP
-    const r = cast(w, 'triangle', bird);
+    const r = cast(w, 'L', bird);
     check(`kill ${i} kind`, r.kind === 'kill' && w.enemies.length === 0);
     scores.push(r.scoreGained);
   }
@@ -99,7 +99,7 @@ function runEnemies(world: World, seconds: number): void {
   w.combo = 4;
   check('unknown sigil = fizzle', cast(w, 'star', null).kind === 'fizzle' && w.combo === 1);
   w.combo = 3;
-  check('hit without kill keeps combo', cast(w, 'triangle', imp).kind === 'hit' && w.combo === 3);
+  check('hit without kill keeps combo', cast(w, 'L', imp).kind === 'hit' && w.combo === 3);
 }
 
 // ---- effectiveness(spell, enemy): 2 / 1 / 0.5 ----
@@ -111,7 +111,7 @@ function runEnemies(world: World, seconds: number): void {
   check('losing element = 1', effectiveness('fire', 'water') === 1);
   // Hints: the shape that beats each element.
   check('fire enemy -> circle', counterShape('fire') === 'circle');
-  check('nature enemy -> triangle', counterShape('nature') === 'triangle');
+  check('nature enemy -> L', counterShape('nature') === 'L');
   check('water enemy -> v', counterShape('water') === 'v');
 }
 
@@ -130,9 +130,9 @@ function runEnemies(world: World, seconds: number): void {
   check('float text events', events.map((e) => e.text).join(',') === `${TEXT.superEffective},+100,${TEXT.miss},${TEXT.fizzle}`, events.map((e) => e.text).join(','));
   check('takeEvents clears the list', w.events.length === 0);
   const boss = spawnEnemy(w, 'boss', 'fire', 0);
-  check('resisted text', cast(w, 'triangle', boss).texts.some((t) => t.text === TEXT.resisted));
+  check('resisted text', cast(w, 'L', boss).texts.some((t) => t.text === TEXT.resisted));
   w.lightningCooldown = 6.2;
-  check('cooldown text shows seconds', cast(w, 'zigzag', null).texts[0].text === TEXT.cooldown(6.2) && TEXT.cooldown(6.2) === 'LIGHTNING 7s');
+  check('cooldown text shows seconds', cast(w, 'zigzag', null).texts[0].text === TEXT.cooldown('lightning', 6.2) && TEXT.cooldown('lightning', 6.2) === 'LIGHTNING 7s');
 }
 
 // ---- Phases: MENU -> PLAYING -> WIN / LOSE ----
@@ -211,7 +211,39 @@ function runEnemies(world: World, seconds: number): void {
   const zBefore = a.pos.z;
   runEnemies(w, 2);
   check('stunned enemy frozen', a.pos.z === zBefore && a.stunT > 0 && a.stateT === 0);
-  check('line sigil = shield', cast(w, 'line', null).spell === 'shield');
+  check('line is not the shield any more', cast(w, 'line', null).spell === 'wind');
+}
+
+// ---- Wind (drawn line): pushes walking enemies back, boss and casting warlocks hold, cooldown ----
+{
+  const w = fresh();
+  const imp = spawnEnemy(w, 'imp', 'fire', -3);
+  const bird = spawnEnemy(w, 'bird', 'water', 3);
+  const boss = spawnEnemy(w, 'boss', 'nature', 0);
+  const warlock = spawnEnemy(w, 'warlock', 'fire', 6);
+  for (const e of w.enemies) e.pos.z = -10;
+  warlock.state = 'charge';
+  w.combo = 3;
+  const r = cast(w, 'line', null);
+  check('wind pushes walkers', r.kind === 'push' && r.pushedIds.length === 2 && imp.pos.z === -10 - CONFIG.WIND_PUSH && bird.pos.z === -10 - CONFIG.WIND_PUSH, JSON.stringify(r.pushedIds));
+  check('wind: boss holds', boss.pos.z === -10);
+  check('wind: casting warlock holds', warlock.pos.z === -10);
+  check('wind keeps combo', w.combo === 3);
+  check('wind sets cooldown', w.windCooldown === CONFIG.WIND_COOLDOWN_S);
+  check('wind text', r.texts[0].text === TEXT.wind);
+  const again = cast(w, 'line', null);
+  check('wind on cooldown', again.kind === 'cooldown' && again.texts[0].text === `WIND ${CONFIG.WIND_COOLDOWN_S}s` && w.combo === 3);
+  check('wind does no damage', imp.hp === CONFIG.IMP.hp);
+
+  imp.pos.z = CONFIG.FIELD.spawnZ + 1;
+  w.windCooldown = 0;
+  cast(w, 'line', null);
+  check('wind never pushes past the spawn line', imp.pos.z === CONFIG.FIELD.spawnZ);
+
+  const empty = fresh();
+  spawnEnemy(empty, 'boss', 'fire', 0);
+  empty.combo = 4;
+  check('wind with nothing to push = miss', cast(empty, 'line', null).kind === 'miss' && empty.combo === 1 && empty.windCooldown === 0);
 }
 
 // ---- Enemies at the wall: 10 damage, removed. Birds dive. ----

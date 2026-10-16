@@ -16,7 +16,9 @@ export function createRecorder(notify: (message: string) => void) {
 
   function load(): Saved[] {
     try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]') as Saved[];
+      const all = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]') as Saved[];
+      // Skip shapes that no longer exist (e.g. old "triangle" templates after FIRE became L).
+      return all.filter((t) => SIGIL_NAMES.includes(t.name));
     } catch {
       return [];
     }

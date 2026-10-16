@@ -36,6 +36,7 @@ export function createWorldUi() {
   let hitGlowAt = -Infinity;
   let shieldAt = -Infinity;
   let lightningFlashAt = -Infinity;
+  let windAt = -Infinity;
 
   onStrokeStart(() => {
     stroke = [];
@@ -88,6 +89,7 @@ export function createWorldUi() {
         }
       }
       if (result.spell === 'shield') shieldAt = now;
+      if (result.kind === 'push') windAt = now;
     },
 
     draw(ctx: CanvasRenderingContext2D, world: World, view: View, now: number) {
@@ -309,6 +311,24 @@ export function createWorldUi() {
     if (lf < 1) {
       ctx.fillStyle = `rgba(200, 225, 255, ${0.35 * (1 - lf)})`;
       ctx.fillRect(0, 0, w, h);
+    }
+
+    // Wind: pale streaks rushing away from the wall (up the screen).
+    const wf = (now - windAt) / 600;
+    if (wf < 1) {
+      ctx.save();
+      ctx.strokeStyle = `rgba(220, 255, 240, ${0.6 * (1 - wf)})`;
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      for (let i = 0; i < 9; i++) {
+        const x = w * (0.1 + 0.1 * i);
+        const y = h * (1 - wf) - (i % 3) * 40;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + (i - 4) * 6, y - 90);
+        ctx.stroke();
+      }
+      ctx.restore();
     }
 
     // Shield: a cyan dome sweeping across the view.

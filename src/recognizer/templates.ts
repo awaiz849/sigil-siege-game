@@ -4,28 +4,30 @@ import type { Point } from '../events.ts';
 import { makeTemplate, type Template } from './dollar.ts';
 
 /** Every name the recognizer can return (besides null). */
-export type SigilName = 'line' | 'v' | 'zigzag' | 'circle' | 'triangle';
-export const SIGIL_NAMES: SigilName[] = ['line', 'v', 'zigzag', 'circle', 'triangle'];
+export type SigilName = 'line' | 'v' | 'zigzag' | 'circle' | 'L';
+export const SIGIL_NAMES: SigilName[] = ['line', 'v', 'zigzag', 'circle', 'L'];
 
-/** Closed shapes end near where they started; open shapes do not. */
-export const CLOSED_SHAPES: SigilName[] = ['circle', 'triangle'];
-export const OPEN_SHAPES: SigilName[] = ['v', 'zigzag'];
+/** Closed shapes end near where they started; open shapes do not.
+ *  Circle is in both lists: circles drawn in the air often leave a big gap. */
+export const CLOSED_SHAPES: SigilName[] = ['circle'];
+export const OPEN_SHAPES: SigilName[] = ['v', 'zigzag', 'L', 'circle'];
 
-function circle(clockwise: boolean): Point[] {
+/** Circle starting at the top. sweepDeg < 360 = left a gap, > 360 = went round too far
+ *  (both are common when drawing in the air). Increasing angle = clockwise on screen (y down). */
+function circle(clockwise: boolean, sweepDeg = 360): Point[] {
   const pts: Point[] = [];
-  for (let i = 0; i <= 32; i++) {
-    // Start at the top. Increasing angle = clockwise on screen (y down).
-    const a = -Math.PI / 2 + (clockwise ? 1 : -1) * (i / 32) * Math.PI * 2;
+  const steps = Math.round(sweepDeg / 10);
+  for (let i = 0; i <= steps; i++) {
+    const a = ((-90 + (clockwise ? 1 : -1) * (i / steps) * sweepDeg) * Math.PI) / 180;
     pts.push({ x: Math.cos(a), y: Math.sin(a) });
   }
   return pts;
 }
 
-function triangle(clockwise: boolean): Point[] {
-  const top = { x: 0, y: -1 };
-  const right = { x: 0.87, y: 0.5 };
-  const left = { x: -0.87, y: 0.5 };
-  return clockwise ? [top, right, left, top] : [top, left, right, top];
+/** L: straight down, then right along the bottom. footLength = bottom bar / upright bar. */
+function ell(footLength: number, reverse = false): Point[] {
+  const pts = [{ x: 0, y: -1 }, { x: 0, y: 1 }, { x: footLength * 2, y: 1 }];
+  return reverse ? pts.reverse() : pts;
 }
 
 /** V: from top-left down to the bottom point and up to top-right. */
@@ -48,8 +50,14 @@ export function builtInTemplates(): Template[] {
   return [
     makeTemplate('circle', circle(true)),
     makeTemplate('circle', circle(false)),
-    makeTemplate('triangle', triangle(true)),
-    makeTemplate('triangle', triangle(false)),
+    makeTemplate('circle', circle(true, 280)), // left a gap
+    makeTemplate('circle', circle(false, 280)),
+    makeTemplate('circle', circle(true, 450)), // went round too far
+    makeTemplate('circle', circle(false, 450)),
+    makeTemplate('L', ell(0.6)), // normal
+    makeTemplate('L', ell(0.3)), // short foot
+    makeTemplate('L', ell(1)), // long foot
+    makeTemplate('L', ell(0.6, true)), // drawn backwards: foot first, then up
     makeTemplate('v', v(0.6)), // normal
     makeTemplate('v', v(0.25)), // narrow
     makeTemplate('v', v(1.2)), // wide

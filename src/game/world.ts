@@ -21,6 +21,7 @@ export function createWorld(difficulty: Difficulty = 'normal', seed: number = Da
     score: 0,
     combo: 1,
     lightningCooldown: 0,
+    windCooldown: 0,
     enemies: [],
     nextEnemyId: 1,
     waveDamaged: false,
@@ -84,6 +85,7 @@ export function update(world: World, dt: number): void {
   if (world.time === 0) world.events.push({ type: 'waveStart', wave: 1 });
   world.time += dt;
   world.lightningCooldown = Math.max(0, world.lightningCooldown - dt);
+  world.windCooldown = Math.max(0, world.windCooldown - dt);
   updateWave(world);
   updateSpawns(world);
   updateEnemies(world, dt);

@@ -1,4 +1,4 @@
-// Spells: targeting, damage rules, combo, MISS / FIZZLE, lightning cooldown and the shield.
+// Spells: targeting, damage rules, combo, MISS / FIZZLE, lightning and wind cooldowns, and the shield.
 // Every cast returns a SpellResult and adds floating-text events, so UI and sound can react. No drawing here.
 import { CONFIG } from '../config.ts';
 import { BEATS, effectiveness } from './types.ts';
@@ -6,13 +6,13 @@ import type { Element, Enemy, FloatText, SpellName, Vec3, World } from './types.
 import { removeEnemy } from './enemies.ts';
 import { logCast } from './roundLog.ts';
 
-/** Which spell each recognizer shape casts. "line" = shield (mouse debug only). */
+/** Which spell each recognizer shape casts. The shield is the open palm, not a shape. */
 export const SIGIL_SPELLS: Record<string, SpellName> = {
   circle: 'water',
-  triangle: 'fire',
+  L: 'fire',
   v: 'nature',
   zigzag: 'lightning',
-  line: 'shield',
+  line: 'wind',
 };
 
 /** The shape to draw against an enemy of this element (the spell that beats it). Used for hints. */
@@ -29,7 +29,8 @@ export const TEXT = {
   miss: 'MISS',
   fizzle: 'FIZZLE',
   blocked: 'BLOCKED!',
-  cooldown: (seconds: number) => `LIGHTNING ${Math.ceil(seconds)}s`,
+  wind: 'WIND!',
+  cooldown: (spell: SpellName, seconds: number) => `${spell.toUpperCase()} ${Math.ceil(seconds)}s`,
   kill: (score: number) => `+${score}`,
 };
 
@@ -54,16 +55,19 @@ export interface Hit {
 export interface SpellResult {
   /** hit = damage only, kill = at least one kill, block = shield stopped warlocks,
    *  miss = no target / nothing to block, fizzle = shape not recognized,
-   *  cooldown = lightning not ready (no penalty), ignored = not in a round. */
-  kind: 'hit' | 'kill' | 'block' | 'miss' | 'fizzle' | 'cooldown' | 'ignored';
+   *  push = wind pushed enemies back, cooldown = lightning / wind not ready (no penalty),
+   *  ignored = not in a round. */
+  kind: 'hit' | 'kill' | 'block' | 'push' | 'miss' | 'fizzle' | 'cooldown' | 'ignored';
   spell: SpellName | null;
   hits: Hit[];
   /** Warlocks the shield blocked. */
   blockedIds: number[];
+  /** Enemies the wind pushed back. */
+  pushedIds: number[];
   scoreGained: number;
   /** Combo after the cast. */
   combo: number;
-  /** Lightning seconds left (for the "cooldown" result). */
+  /** Seconds until lightning / wind is ready (for the "cooldown" result). */
   cooldownLeft: number;
   /** The floating texts this cast produced (also pushed to world.events as 'floatText'). */
   texts: FloatText[];
@@ -90,7 +94,7 @@ export function pickTarget(world: World, strokeCentre: ScreenPoint, project: Pro
 
 /**
  * Cast the spell for a drawn shape.
- * @param shape        recognizer name (line | v | zigzag | circle | triangle), or null if not recognized
+ * @param shape        recognizer name (line | v | zigzag | circle | L), or null if not recognized
  * @param strokeCentre centre of the stroke in overlay pixels: picks the target
  * @param project      renderer's enemy -> screen position function
  */
@@ -111,6 +115,7 @@ function castShape(world: World, shape: string | null, targetId: number | null):
   if (!spell) return fail(world, 'fizzle', null);
   if (spell === 'shield') return castShield(world);
   if (spell === 'lightning') return castLightning(world);
+  if (spell === 'wind') return castWind(world);
 
   const target = world.enemies.find((e) => e.id === targetId);
   if (!target) return fail(world, 'miss', spell);
@@ -122,7 +127,7 @@ function castLightning(world: World): SpellResult {
   if (world.lightningCooldown > 0) {
     const left = world.lightningCooldown;
     return result(world, 'cooldown', 'lightning', { cooldownLeft: left }, [
-      { text: TEXT.cooldown(left), pos: null, tone: 'info' },
+      { text: TEXT.cooldown('lightning', left), pos: null, tone: 'info' },
     ]);
   }
   if (world.enemies.length === 0) return fail(world, 'miss', 'lightning');
@@ -130,6 +135,24 @@ function castLightning(world: World): SpellResult {
   // Copy the list: killed enemies are removed while we loop.
   const hits = world.enemies.slice().map((e) => damageEnemy(world, e, null));
   return finish(world, 'lightning', hits);
+}
+
+/** Wind (drawn line): pushes every WALKING enemy back toward the forest. The boss and
+ *  warlocks that are casting hold their ground. Casting on cooldown costs nothing. */
+function castWind(world: World): SpellResult {
+  if (world.windCooldown > 0) {
+    const left = world.windCooldown;
+    return result(world, 'cooldown', 'wind', { cooldownLeft: left }, [
+      { text: TEXT.cooldown('wind', left), pos: null, tone: 'info' },
+    ]);
+  }
+  const pushed = world.enemies.filter((e) => e.type !== 'boss' && e.state === 'walk');
+  if (pushed.length === 0) return fail(world, 'miss', 'wind');
+  world.windCooldown = CONFIG.WIND_COOLDOWN_S;
+  for (const e of pushed) e.pos.z = Math.max(CONFIG.FIELD.spawnZ, e.pos.z - CONFIG.WIND_PUSH);
+  return result(world, 'push', 'wind', { pushedIds: pushed.map((e) => e.id) }, [
+    { text: TEXT.wind, pos: null, tone: 'good' },
+  ]);
 }
 
 /** Shield (open palm): blocks every charging warlock and stuns each one. */
@@ -207,5 +230,5 @@ function result(
   texts: FloatText[] = [],
 ): SpellResult {
   for (const t of texts) world.events.push({ type: 'floatText', ...t });
-  return { kind, spell, hits: [], blockedIds: [], scoreGained: 0, combo: world.combo, cooldownLeft: 0, texts, ...extra };
+  return { kind, spell, hits: [], blockedIds: [], pushedIds: [], scoreGained: 0, combo: world.combo, cooldownLeft: 0, texts, ...extra };
 }
