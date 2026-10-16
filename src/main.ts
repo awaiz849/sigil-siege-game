@@ -151,7 +151,12 @@ function handleEvents(events: GameEvent[]) {
   for (const ev of events) {
     if (ev.type === 'castleHit') world3d.shake(ev.cause === 'blast' ? 0.9 : 0.6);
     else if (ev.type === 'waveStart') setMusicIntensity(ev.wave);
-    else if (ev.type === 'bossArrive') setMusicIntensity(4);
+    else if (ev.type === 'bossArrive') {
+      setMusicIntensity(4);
+      // Boss entrance: brief slow motion + a big ground shake.
+      slowMoUntil = performance.now() + CONFIG.BOSS_ENTRANCE.seconds * 1000;
+      world3d.shake(CONFIG.BOSS_ENTRANCE.shake);
+    }
     else if (ev.type === 'gameOver') {
       setMusicIntensity(0);
       saveRoundLog(formatRoundLog(world));
@@ -181,9 +186,11 @@ ${report}`;
 }
 
 let lastNow = 0;
+let slowMoUntil = 0; // boss entrance slow motion ends at this time (ms)
 function frame(now: number) {
   // Never 0: update() treats time 0 as "round just started".
-  const dt = lastNow ? Math.min(0.1, (now - lastNow) / 1000) : 1 / 60;
+  const realDt = lastNow ? Math.min(0.1, (now - lastNow) / 1000) : 1 / 60;
+  const dt = now < slowMoUntil ? realDt * CONFIG.BOSS_ENTRANCE.speed : realDt;
   lastNow = now;
   hand?.update();
   screens.update(now);

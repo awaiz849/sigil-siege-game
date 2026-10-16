@@ -132,6 +132,8 @@ export const CONFIG = {
   FLOAT_TEXT_RISE_PX: 60,
   /** Red edge glow after a castle hit. */
   HIT_GLOW_S: 0.7,
+  /** Boss entrance: the game runs at `speed` for `seconds` (slow motion) while the ground shakes. */
+  BOSS_ENTRANCE: { seconds: 1.6, speed: 0.35, shake: 0.7 },
   /** Banners ("WAVE 2", "BOSS INCOMING") stay this long. */
   BANNER_S: 2,
 
