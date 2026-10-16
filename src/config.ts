@@ -67,7 +67,7 @@ export const CONFIG = {
   /** Line (wind / time warp) check: after smoothing out hand jitter, the stroke may bend away from the
    *  straight segment between its ends by at most maxBend x its length (air lines wobble and arc a bit),
    *  and must not double back (end gap / path length >= minStraightness). */
-  LINE: { maxBend: 0.11, minStraightness: 0.6 },
+  LINE: { maxBend: 0.1, minStraightness: 0.6 },
   /** Precheck: end gap below this fraction of the bounding-box diagonal = closed shape. */
   CLOSED_GAP_RATIO: 0.25,
 
