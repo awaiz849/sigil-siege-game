@@ -38,6 +38,8 @@ export async function createHandInput() {
   let drawing = false;
   let points: Point[] = [];
 
+  let lastCursor: Point = { x: 0, y: 0 };
+
   // Smoothed cursor in screen pixels.
   const fx = new OneEuroFilter(CONFIG.ONE_EURO_MIN_CUTOFF, CONFIG.ONE_EURO_BETA);
   const fy = new OneEuroFilter(CONFIG.ONE_EURO_MIN_CUTOFF, CONFIG.ONE_EURO_BETA);
@@ -83,6 +85,8 @@ export async function createHandInput() {
   }
 
   function handLost() {
+    // Tell listeners the hand is gone (pose 'other'), so e.g. a palm hold stops counting.
+    if (debug.handVisible) emitCursor(lastCursor.x, lastCursor.y, 'other');
     debug.handVisible = false;
     debug.landmarks = [];
     endStroke(false); // hand left the camera: drop the stroke
@@ -139,6 +143,7 @@ export async function createHandInput() {
     else updatePoses();
 
     if (drawing) addPoint(x, y);
+    lastCursor = { x, y };
     emitCursor(x, y, drawing ? 'point' : stablePose === 'point' ? 'other' : stablePose);
   }
 

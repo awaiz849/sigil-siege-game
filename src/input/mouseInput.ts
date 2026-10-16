@@ -1,14 +1,17 @@
 // DEBUG input only: mouse drag = stroke. Emits exactly the same events as hand input,
 // so the rest of the game cannot tell the difference.
 // Mouse position is already in overlay pixels (CSS px, origin top-left), no mirroring needed.
+// Left drag = draw. Right button held = open palm (shield, and hold to start / play again).
 import { CONFIG } from '../config.ts';
-import { emitCursor, emitStrokeEnd, emitStrokePoint, emitStrokeStart, type Point } from '../events.ts';
+import { emitCursor, emitPalm, emitStrokeEnd, emitStrokePoint, emitStrokeStart, type Point, type Pose } from '../events.ts';
 import { isStrokeLongEnough } from './strokeFilter.ts';
 
 export function createMouseInput() {
   let enabled = false;
   let drawing = false;
+  let palm = false;
   let points: Point[] = [];
+  const pose = (): Pose => (drawing ? 'point' : palm ? 'palm' : 'other');
 
   function addPoint(x: number, y: number) {
     // Skip points closer than a few pixels to the last one (mouse spam).
@@ -27,7 +30,17 @@ export function createMouseInput() {
   }
 
   // Listen on window: the overlay canvas has pointer-events: none.
+  // No context menu: the right button is the palm.
+  window.addEventListener('contextmenu', (e) => {
+    if (enabled) e.preventDefault();
+  });
+
   window.addEventListener('mousedown', (e) => {
+    if (enabled && e.button === 2 && !drawing) {
+      palm = true;
+      emitPalm();
+      emitCursor(e.clientX, e.clientY, 'palm');
+    }
     if (!enabled || e.button !== 0) return;
     drawing = true;
     points = [];
@@ -39,18 +52,25 @@ export function createMouseInput() {
   window.addEventListener('mousemove', (e) => {
     if (!enabled) return;
     // Pen down while dragging = 'point', otherwise just hovering = 'other'.
-    emitCursor(e.clientX, e.clientY, drawing ? 'point' : 'other');
+    emitCursor(e.clientX, e.clientY, pose());
     if (drawing) addPoint(e.clientX, e.clientY);
   });
 
   window.addEventListener('mouseup', (e) => {
+    if (enabled && e.button === 2) {
+      palm = false;
+      emitCursor(e.clientX, e.clientY, 'other');
+    }
     if (!enabled || e.button !== 0) return;
     endStroke();
     emitCursor(e.clientX, e.clientY, 'other');
   });
 
   // Releasing the button outside the window still ends the stroke.
-  window.addEventListener('blur', endStroke);
+  window.addEventListener('blur', () => {
+    endStroke();
+    palm = false;
+  });
 
   return {
     isEnabled: () => enabled,

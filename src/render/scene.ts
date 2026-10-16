@@ -90,11 +90,16 @@ export function createScene(canvas: HTMLCanvasElement) {
     else renderer.render(scene, camera);
   }
 
-  /** Enemy position in overlay pixels. heightFactor 0 = feet, 0.5 = middle, 1 = top of head. */
-  function project(enemy: Enemy, heightFactor = 0.5): { x: number; y: number } {
-    tmp.set(enemy.pos.x, enemy.pos.y + enemies.heightOf(enemy.id) * heightFactor, enemy.pos.z);
-    tmp.project(camera);
+  /** World point -> overlay pixels, or null if it is behind the camera. */
+  function projectPoint(x: number, y: number, z: number): { x: number; y: number } | null {
+    tmp.set(x, y, z).project(camera);
+    if (tmp.z > 1) return null;
     return { x: (tmp.x * 0.5 + 0.5) * width, y: (-tmp.y * 0.5 + 0.5) * height };
+  }
+
+  /** Enemy position in overlay pixels. heightFactor 0 = feet, 0.5 = middle, 1 = top of head. */
+  function project(enemy: Enemy, heightFactor = 0.5): { x: number; y: number } | null {
+    return projectPoint(enemy.pos.x, enemy.pos.y + enemies.heightOf(enemy.id) * heightFactor, enemy.pos.z);
   }
 
   return {
@@ -104,14 +109,17 @@ export function createScene(canvas: HTMLCanvasElement) {
     resize,
     render,
     project,
+    projectPoint,
+    /** Model height of an enemy (world units). */
+    heightOf: (id: number) => enemies.heightOf(id),
     /** Kick the camera (0..1). */
     shake(amount: number) {
       shakeAmount = Math.min(1, shakeAmount + amount);
     },
-    /** Spray particles at an enemy (spell hits). */
-    burstAt(enemy: Enemy, color: number, count = 20) {
-      tmp.set(enemy.pos.x, enemy.pos.y + enemies.heightOf(enemy.id) * 0.5, enemy.pos.z);
-      particles.burst(tmp.clone(), color, count, 4, 2, 0.6);
+    /** Spray particles at a world position, raised to the middle of an enemy of that id (spell hits). */
+    burstAt(pos: { x: number; y: number; z: number }, enemyId: number, color: number, count = 24) {
+      const p = new THREE.Vector3(pos.x, pos.y + enemies.heightOf(enemyId) * 0.5, pos.z);
+      particles.burst(p, color, count, 5, 2, 0.6);
     },
   };
 }

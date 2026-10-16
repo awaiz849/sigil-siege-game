@@ -84,5 +84,6 @@ export function createDebugOverlay() {
     tick,
     draw,
     toggle: () => (visible = !visible),
+    isVisible: () => visible,
   };
 }

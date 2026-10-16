@@ -106,6 +106,17 @@ export const CONFIG = {
   /** Sideways nudge so two enemies lined up exactly still slide around each other. */
   PUSH_NUDGE: 0.05,
 
+  // ---- Overlay UI ----
+  /** Each trail point fades out over this many ms. */
+  TRAIL_FADE_MS: 600,
+  /** Floating texts ("SUPER EFFECTIVE!", "+300") live this long and rise this many px. */
+  FLOAT_TEXT_S: 1.2,
+  FLOAT_TEXT_RISE_PX: 60,
+  /** Red edge glow after a castle hit. */
+  HIT_GLOW_S: 0.7,
+  /** Banners ("WAVE 2", "BOSS INCOMING") stay this long. */
+  BANNER_S: 2,
+
   // ---- Rendering ----
   /** Cap on devicePixelRatio; lower it if 3D stutters with tracking. */
   MAX_PIXEL_RATIO: 1.5,

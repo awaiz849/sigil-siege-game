@@ -1,16 +1,20 @@
 // Entry point: creates the two canvases (3D below, 2D overlay on top) and runs the frame loop.
-import { CONFIG, type Difficulty } from './config.ts';
+// Pipeline: input (hand or mouse) -> recognizer -> castSpell with the renderer's project()
+//           -> update(world) -> render(world) -> overlay (HUD, badges, texts).
+import { type Difficulty } from './config.ts';
 import { createScene } from './render/scene.ts';
 import { createOverlay } from './ui/overlay.ts';
 import { createDebugOverlay } from './ui/debugOverlay.ts';
+import { loadFonts, FONT_TITLE } from './ui/fonts.ts';
 import { createMouseInput } from './input/mouseInput.ts';
 import { createHandInput, type HandInput } from './input/handInput.ts';
-import { onCursor, onPalm, onStrokeEnd, onStrokeStart, type Point, type Pose } from './events.ts';
+import { createPalmHold } from './input/palmHold.ts';
+import { onPalm, onStrokeEnd, onStrokeStart } from './events.ts';
 import { classify } from './recognizer/index.ts';
 import { createRecorder } from './recognizer/recorder.ts';
-import type { World } from './game/types.ts';
+import type { GameEvent, World } from './game/types.ts';
 import { createWorld, startRound, takeEvents, update } from './game/world.ts';
-import { castShield, castSpell } from './game/spells.ts';
+import { castShield, castSpell, type SpellResult } from './game/spells.ts';
 import { formatRoundLog, noteStrokeStart } from './game/roundLog.ts';
 
 const glCanvas = document.createElement('canvas');
@@ -21,6 +25,8 @@ document.body.append(glCanvas, overlayCanvas);
 const world3d = createScene(glCanvas);
 const overlay = createOverlay(overlayCanvas);
 const debugOverlay = createDebugOverlay();
+loadFonts().catch((err) => console.warn('Fonts failed to load', err));
+
 // ---- Game ----
 // Difficulty comes from the URL until the title screen exists (?difficulty=easy|normal|hard).
 const urlDifficulty = new URLSearchParams(location.search).get('difficulty');
@@ -77,18 +83,14 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === 'r') recorder.arm();
 });
 
-/** Centre of a stroke's bounding box: picks the target. */
-function strokeCentre(points: Point[]): Point {
-  const xs = points.map((p) => p.x);
-  const ys = points.map((p) => p.y);
-  return { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 };
-}
-
 /** Leave the menu / end banner: a fresh round. */
 function newRound() {
   world = startRound(createWorld(difficulty));
-  overlay.flash(`DEFEND THE WALL (${difficulty.toUpperCase()})`, 1.5);
 }
+
+// ---- Casting: stroke -> recognizer -> spell on the enemy nearest the stroke centre ----
+const view = { project: world3d.project, projectPoint: world3d.projectPoint };
+const SPELL_COLOR: Record<string, number> = { water: 0x3fa9ff, fire: 0xff5a2e, nature: 0x6fe05a, lightning: 0xcfe6ff };
 
 // Pen down: start the pen-down -> cast timer for the tuning log.
 onStrokeStart(() => noteStrokeStart(world));
@@ -97,45 +99,42 @@ onStrokeStart(() => noteStrokeStart(world));
 onStrokeEnd((points) => {
   if (recorder.consume(points)) return;
   const shape = classify(points);
-  console.log('classify:', shape);
-  // Mouse debug has no open palm: a stroke starts the round instead.
+  const centre = overlay.worldUi.strokeCentre(points)!;
+  if (debugOverlay.isVisible()) overlay.showDebugLabel(`${shape.name ?? 'no match'} ${shape.score.toFixed(2)}`, centre.x, centre.y);
+  // Mouse debug: a stroke also starts the round (right button = palm works too).
   if (world.phase !== 'PLAYING') {
     if (mouse.isEnabled()) newRound();
     return;
   }
-  const result = castSpell(world, shape.name, strokeCentre(points), world3d.project);
-  console.log('cast:', result.kind, result.spell, result.texts.map((t) => t.text).join(' '));
+  showCast(castSpell(world, shape.name, centre, world3d.project));
 });
 
 // Open palm = shield, instantly.
 onPalm(() => {
-  if (world.phase === 'PLAYING') castShield(world);
+  if (world.phase === 'PLAYING') showCast(castShield(world));
 });
 
-// Hold the open palm to start / play again (outside a round only).
-let pose: Pose = 'other';
-let palmHeldS = 0;
-onCursor((_x, _y, p) => (pose = p));
-function updatePalmHold(dt: number) {
-  palmHeldS = world.phase !== 'PLAYING' && pose === 'palm' ? palmHeldS + dt : 0;
-  if (palmHeldS >= CONFIG.PALM_HOLD_START_S) {
-    palmHeldS = 0;
-    newRound();
+// Hold the open palm 1.2 s to start / play again (outside a round only).
+const palmHold = createPalmHold(() => {
+  if (world.phase !== 'PLAYING') newRound();
+});
+
+/** 3D + overlay feedback for a cast (texts arrive separately, as game events). */
+function showCast(result: SpellResult) {
+  const color = result.spell ? SPELL_COLOR[result.spell] : undefined;
+  if (color !== undefined) {
+    for (const hit of result.hits) world3d.burstAt(hit.pos, hit.enemyId, color, hit.effect === 'strong' ? 40 : 20);
   }
+  overlay.worldUi.handleCast(result, view, performance.now());
 }
 
-/** React to game events. Temporary text feedback until the HUD and floating texts (F2) exist. */
-function handleEvents() {
-  for (const ev of takeEvents(world)) {
-    if (ev.type === 'floatText') overlay.flash(ev.text, 0.8);
-    else if (ev.type === 'castleHit') world3d.shake(ev.cause === 'blast' ? 0.8 : 0.5);
-    else if (ev.type === 'bossArrive') overlay.flash('THE BOSS IS COMING', 2);
-    else if (ev.type === 'waveStart') overlay.flash(`WAVE ${ev.wave}`, 1.5);
-    else if (ev.type === 'gameOver') {
-      overlay.flash(ev.result === 'WIN' ? 'VICTORY! Hold palm to play again' : 'THE WALL FELL. Hold palm to play again', 5);
-      saveRoundLog(formatRoundLog(world));
-    }
+/** Game events: camera shake on castle hits, round log at game over; the overlay shows the rest. */
+function handleEvents(events: GameEvent[]) {
+  for (const ev of events) {
+    if (ev.type === 'castleHit') world3d.shake(ev.cause === 'blast' ? 0.9 : 0.6);
+    else if (ev.type === 'gameOver') saveRoundLog(formatRoundLog(world));
   }
+  overlay.worldUi.handleEvents(events, performance.now());
 }
 
 /** A3 tuning: print the round log, keep the last 20 in localStorage ("sigil-siege-round-logs"),
@@ -155,34 +154,47 @@ ${report}`;
   }
 }
 
-/** Temporary HUD (top-left) until Farhan's HUD (F2) lands. */
-function drawTempHud(ctx: CanvasRenderingContext2D) {
-  ctx.font = '18px monospace';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
+/** Temporary start / end prompt until the title and end screens (F3) exist. */
+function drawTempPrompt(ctx: CanvasRenderingContext2D) {
+  if (world.phase === 'PLAYING') return;
+  const w = ctx.canvas.width;
+  const h = ctx.canvas.height;
+  const title = world.phase === 'WIN' ? 'VICTORY!' : world.phase === 'LOSE' ? 'THE WALL FELL' : 'SIGIL SIEGE';
+  const sub = mouse.isEnabled() ? 'Hold right mouse button (or draw) to start' : 'Hold your open palm to start';
+  ctx.save();
+  ctx.fillStyle = 'rgba(13, 11, 36, 0.55)';
+  ctx.fillRect(0, h * 0.32, w, h * 0.3);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `700 56px ${FONT_TITLE}`;
+  ctx.fillStyle = '#F2C14E';
+  ctx.fillText(title, w / 2, h * 0.42);
+  ctx.font = `20px ${FONT_TITLE}`;
   ctx.fillStyle = '#ffffff';
-  const lines =
-    world.phase === 'MENU'
-      ? [mouse.isEnabled() ? 'Draw any stroke to start' : 'Hold open palm to start', `Difficulty: ${difficulty}`]
-      : [
-          `Castle ${world.castleHp}/${CONFIG.CASTLE_HP}   Score ${world.score}   Combo x${world.combo}`,
-          `Wave ${world.wave}   Time ${Math.max(0, CONFIG.ROUND_SECONDS - world.time).toFixed(0)} s`,
-          `Lightning ${world.lightningCooldown > 0 ? world.lightningCooldown.toFixed(0) + ' s' : 'READY'}`,
-        ];
-  lines.forEach((line, i) => ctx.fillText(line, 12, 70 + i * 24));
+  ctx.fillText(`${sub}  (${difficulty.toUpperCase()})`, w / 2, h * 0.52);
+  // Palm-hold progress ring.
+  if (palmHold.progress > 0) {
+    ctx.strokeStyle = '#9fe6ff';
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.arc(w / 2, h * 0.58, 16, -Math.PI / 2, -Math.PI / 2 + palmHold.progress * Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 let lastNow = 0;
 function frame(now: number) {
-  const dt = lastNow ? Math.min(0.1, (now - lastNow) / 1000) : 0;
+  // Never 0: update() treats time 0 as "round just started".
+  const dt = lastNow ? Math.min(0.1, (now - lastNow) / 1000) : 1 / 60;
   lastNow = now;
   hand?.update();
-  updatePalmHold(dt);
+  palmHold.update(now);
   update(world, dt);
-  handleEvents();
+  handleEvents(takeEvents(world));
   world3d.render(world, dt);
-  overlay.draw();
-  drawTempHud(overlay.ctx);
+  overlay.draw(world, view, now);
+  drawTempPrompt(overlay.ctx);
   debugOverlay.tick(now);
   debugOverlay.draw(overlay.ctx, hand);
   requestAnimationFrame(frame);

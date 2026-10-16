@@ -8,10 +8,11 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test:recognizer": "node tests/recognizer.test.ts",
-    "test": "npm run test:recognizer && npm run test:poses && npm run test:rules && npm run test:spawns",
+    "test": "npm run test:recognizer && npm run test:poses && npm run test:rules && npm run test:spawns && npm run test:helpers",
     "test:poses": "node tests/poses.test.ts",
     "test:rules": "node tests/rules.test.ts",
-    "test:spawns": "node tests/spawns.test.ts"
+    "test:spawns": "node tests/spawns.test.ts",
+    "test:helpers": "node tests/helpers.test.ts"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^1.1.1",
