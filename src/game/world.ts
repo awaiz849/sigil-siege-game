@@ -1,18 +1,19 @@
 // The World: one plain object holding the whole game state, in world units.
 // Logic updates it; the renderer and UI read it every frame. No drawing here.
 import { CONFIG, type Difficulty } from '../config.ts';
-import type { Element, World } from './types.ts';
+import type { Element, GameEvent, World } from './types.ts';
 import { updateEnemies } from './enemies.ts';
 import { updateSpawns } from './waves.ts';
 import { pushApart } from './crowd.ts';
 
 export const ELEMENTS: Element[] = ['fire', 'water', 'nature'];
 
-/** A fresh round on the given difficulty. Pass a seed for reproducible tests. */
+/** A fresh world on the given difficulty, waiting in the menu. Call startRound() to play.
+ *  Pass a seed for reproducible tests. */
 export function createWorld(difficulty: Difficulty = 'normal', seed: number = Date.now()): World {
   return {
     difficulty,
-    phase: 'playing',
+    phase: 'MENU',
     time: 0,
     wave: 1,
     castleHp: CONFIG.CASTLE_HP,
@@ -39,6 +40,13 @@ export function createWorld(difficulty: Difficulty = 'normal', seed: number = Da
   };
 }
 
+/** Leave the menu and start the round (called when the player holds the palm on the title screen).
+ *  To play again, create a new world with createWorld() and start that one. */
+export function startRound(world: World): World {
+  if (world.phase === 'MENU') world.phase = 'PLAYING';
+  return world;
+}
+
 /** Seeded random number in [0, 1) (mulberry32). Always use this, never Math.random. */
 export function random(world: World): number {
   world.rng = (world.rng + 0x6d2b79f5) >>> 0;
@@ -60,10 +68,14 @@ export function damageCastle(world: World, enemyId: number, damage: number, caus
   world.events.push({ type: 'castleHit', enemyId, damage, cause });
 }
 
-/** Advance the game by dt seconds. Does nothing once the round is over. */
-export function updateWorld(world: World, dt: number): void {
-  world.events.length = 0;
-  if (world.phase !== 'playing') return;
+/** Hand over every event since the last call and clear the list. The UI calls this once per frame. */
+export function takeEvents(world: World): GameEvent[] {
+  return world.events.splice(0);
+}
+
+/** Advance the game by dt seconds (capped at MAX_DT). Does nothing in the menu or once the round is over. */
+export function update(world: World, dt: number): void {
+  if (world.phase !== 'PLAYING') return;
   dt = Math.min(dt, CONFIG.MAX_DT);
 
   if (world.time === 0) world.events.push({ type: 'waveStart', wave: 1 });
@@ -95,11 +107,11 @@ function awardCleanWave(world: World): void {
 /** Lose at 0 HP; win by surviving the round or killing the boss. */
 function checkEnd(world: World): void {
   if (world.castleHp <= 0) {
-    world.phase = 'lost';
-    world.events.push({ type: 'gameOver', result: 'lost' });
+    world.phase = 'LOSE';
+    world.events.push({ type: 'gameOver', result: 'LOSE' });
   } else if (world.time >= CONFIG.ROUND_SECONDS || world.bossDefeated) {
     awardCleanWave(world); // the last wave counts too
-    world.phase = 'won';
-    world.events.push({ type: 'gameOver', result: 'won' });
+    world.phase = 'WIN';
+    world.events.push({ type: 'gameOver', result: 'WIN' });
   }
 }

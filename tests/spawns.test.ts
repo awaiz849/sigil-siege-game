@@ -1,9 +1,9 @@
 // Spawn simulation: plays full 90 s rounds on each difficulty with a fake player and checks
 // the spawn counts (~27 / 34 / 43 from CLAUDE.md), the boss pause and the enemy cap.
-// Run: npm run test:spawn
+// Run: npm run test:spawns
 import { CONFIG, type Difficulty } from '../src/config.ts';
 import type { World } from '../src/game/types.ts';
-import { createWorld, updateWorld } from '../src/game/world.ts';
+import { createWorld, startRound, takeEvents, update } from '../src/game/world.ts';
 import { removeEnemy } from '../src/game/enemies.ts';
 
 /** Target spawns per round from CLAUDE.md, and how far off we allow. */
@@ -33,12 +33,12 @@ interface RoundLog {
  * frozen = enemies stop a little way in (clear of the spawn lanes) and never die, so the field fills to the cap.
  */
 function playRound(difficulty: Difficulty, seed: number, killAfter: number, frozen = false): RoundLog {
-  const world = createWorld(difficulty, seed);
+  const world = startRound(createWorld(difficulty, seed));
   world.castleHp = Infinity;
   const log: RoundLog = { world, spawnTimes: [], maxOnField: 0, bossAt: -1 };
-  while (world.phase === 'playing') {
-    updateWorld(world, DT);
-    for (const ev of world.events) {
+  while (world.phase === 'PLAYING') {
+    update(world, DT);
+    for (const ev of takeEvents(world)) {
       if (ev.type === 'spawn' && ev.enemyType !== 'boss') log.spawnTimes.push(world.time);
       if (ev.type === 'bossArrive') log.bossAt = world.time;
     }
@@ -70,6 +70,8 @@ for (const difficulty of ['easy', 'normal', 'hard'] as Difficulty[]) {
           `${s.imp}/${s.bird}/${s.warlock}/${s.boss}`.padEnd(22) +
           `${log.maxOnField} (${cap})`,
       );
+      const after = log.spawnTimes.find((t) => t > log.bossAt) ?? NaN;
+      console.log(`            boss at ${log.bossAt.toFixed(1)} s, next spawn at ${after.toFixed(1)} s (pause ${CONFIG.BOSS_SPAWN_PAUSE_S} s)`);
     }
 
     // Spawn count close to the CLAUDE.md table.

@@ -1,10 +1,12 @@
 // Game rules test: every rule from CLAUDE.md "Spells", "Enemies" and win/lose, on hand-built worlds.
+// Spells are cast like the real game: castSpell(world, shape, strokeCentre, project) with a fake project().
 // Run: npm run test:rules
 import { CONFIG } from '../src/config.ts';
-import type { World } from '../src/game/types.ts';
-import { createWorld, updateWorld } from '../src/game/world.ts';
+import { effectiveness } from '../src/game/types.ts';
+import type { Enemy, World } from '../src/game/types.ts';
+import { createWorld, startRound, takeEvents, update } from '../src/game/world.ts';
 import { spawnEnemy, updateEnemies, warlockStopZ } from '../src/game/enemies.ts';
-import { castShield, castSpell, pickTarget } from '../src/game/spells.ts';
+import { TEXT, castShield, castSpell, castSpellOn, pickTarget } from '../src/game/spells.ts';
 import { pushApart } from '../src/game/crowd.ts';
 
 let failures = 0;
@@ -18,8 +20,16 @@ function check(name: string, ok: boolean, detail = ''): void {
 }
 const near = (a: number, b: number) => Math.abs(a - b) < 1e-6;
 
-/** Empty world: no spawns happen because we never call updateWorld on it (only updateEnemies). */
-const fresh = (): World => createWorld('normal', 42);
+/** Empty world in a running round: no spawns happen because we never call update on it (only updateEnemies). */
+const fresh = (): World => startRound(createWorld('normal', 42));
+
+/** Fake renderer: screen x = 500 + 50 * world x, every enemy at screen y 300. */
+const fakeProject = (e: Enemy) => ({ x: 500 + e.pos.x * 50, y: 300 });
+
+/** Draw a shape right on top of an enemy, or at the far corner when target is null. */
+function cast(w: World, shape: string | null, target: Enemy | null) {
+  return castSpell(w, shape, target ? fakeProject(target) : { x: 0, y: 0 }, fakeProject);
+}
 
 /** Run only the enemy logic for `seconds`, in small steps. */
 function runEnemies(world: World, seconds: number): void {
@@ -40,13 +50,13 @@ function runEnemies(world: World, seconds: number): void {
   for (const [sigil, element, expected] of cases) {
     const w = fresh();
     const boss = spawnEnemy(w, 'boss', element, 0); // 8 HP, nothing dies
-    const r = castSpell(w, sigil, boss.id);
+    const r = cast(w, sigil, boss);
     check(`${sigil} vs ${element} = ${expected}`, r.kind === 'hit' && near(r.hits[0].damage, expected), JSON.stringify(r.hits));
     check(`${sigil} vs ${element} hp`, near(boss.hp, CONFIG.BOSS.hp - expected));
   }
   const w = fresh();
   const imp = spawnEnemy(w, 'imp', 'fire', 0);
-  check('strong hit reports effect', castSpell(w, 'circle', imp.id).hits[0].effect === 'strong');
+  check('strong hit reports effect', cast(w, 'circle', imp).hits[0].effect === 'strong');
 }
 
 // ---- Stunned enemies take x2 more (stacks with element) ----
@@ -54,7 +64,7 @@ function runEnemies(world: World, seconds: number): void {
   const w = fresh();
   const boss = spawnEnemy(w, 'boss', 'fire', 0);
   boss.stunT = 2;
-  const r = castSpell(w, 'circle', boss.id);
+  const r = cast(w, 'circle', boss);
   check('strong x stunned = 4', near(r.hits[0].damage, 4) && r.hits[0].stunned);
 }
 
@@ -64,7 +74,7 @@ function runEnemies(world: World, seconds: number): void {
   const scores: number[] = [];
   for (let i = 0; i < 7; i++) {
     const bird = spawnEnemy(w, 'bird', 'nature', 0); // 1 HP
-    const r = castSpell(w, 'triangle', bird.id);
+    const r = cast(w, 'triangle', bird);
     check(`kill ${i} kind`, r.kind === 'kill' && w.enemies.length === 0);
     scores.push(r.scoreGained);
   }
@@ -77,16 +87,61 @@ function runEnemies(world: World, seconds: number): void {
 {
   const w = fresh();
   w.combo = 4;
-  check('no target = miss', castSpell(w, 'circle', null).kind === 'miss' && w.combo === 1);
-  w.combo = 4;
-  check('dead/unknown target = miss', castSpell(w, 'circle', 999).kind === 'miss' && w.combo === 1);
-  w.combo = 4;
-  check('null sigil = fizzle', castSpell(w, null, null).kind === 'fizzle' && w.combo === 1);
-  w.combo = 4;
-  check('unknown sigil = fizzle', castSpell(w, 'star', null).kind === 'fizzle' && w.combo === 1);
-  w.combo = 3;
+  check('no enemies = miss', cast(w, 'circle', null).kind === 'miss' && w.combo === 1);
   const imp = spawnEnemy(w, 'imp', 'water', 0);
-  check('hit without kill keeps combo', castSpell(w, 'triangle', imp.id).kind === 'hit' && w.combo === 3);
+  w.combo = 4;
+  check('enemy off screen = miss', castSpell(w, 'circle', { x: 0, y: 0 }, () => null).kind === 'miss' && w.combo === 1);
+  w.combo = 4;
+  check('dead/unknown id = miss', castSpellOn(w, 'circle', 999).kind === 'miss' && w.combo === 1);
+  w.combo = 4;
+  check('null sigil = fizzle', cast(w, null, null).kind === 'fizzle' && w.combo === 1);
+  w.combo = 4;
+  check('unknown sigil = fizzle', cast(w, 'star', null).kind === 'fizzle' && w.combo === 1);
+  w.combo = 3;
+  check('hit without kill keeps combo', cast(w, 'triangle', imp).kind === 'hit' && w.combo === 3);
+}
+
+// ---- effectiveness(spell, enemy): 2 / 1 / 0.5 ----
+{
+  check('water > fire', effectiveness('water', 'fire') === 2);
+  check('fire > nature', effectiveness('fire', 'nature') === 2);
+  check('nature > water', effectiveness('nature', 'water') === 2);
+  check('same element = 0.5', effectiveness('fire', 'fire') === 0.5);
+  check('losing element = 1', effectiveness('fire', 'water') === 1);
+}
+
+// ---- Floating texts: in the result AND as world events ----
+{
+  const w = fresh();
+  const imp = spawnEnemy(w, 'imp', 'fire', 0);
+  const r = cast(w, 'circle', imp); // water on fire: 2 damage kills the 2-HP imp
+  const texts = r.texts.map((t) => t.text);
+  check('super effective text', texts.includes(TEXT.superEffective), texts.join(','));
+  check('kill score text', texts.includes('+100'), texts.join(','));
+  check('texts placed over the enemy', r.texts.every((t) => t.pos !== null && t.pos.x === 0));
+  cast(w, 'circle', null);
+  cast(w, null, null);
+  const events = takeEvents(w).filter((e) => e.type === 'floatText');
+  check('float text events', events.map((e) => e.text).join(',') === `${TEXT.superEffective},+100,${TEXT.miss},${TEXT.fizzle}`, events.map((e) => e.text).join(','));
+  check('takeEvents clears the list', w.events.length === 0);
+  const boss = spawnEnemy(w, 'boss', 'fire', 0);
+  check('resisted text', cast(w, 'triangle', boss).texts.some((t) => t.text === TEXT.resisted));
+  w.lightningCooldown = 6.2;
+  check('cooldown text shows seconds', cast(w, 'zigzag', null).texts[0].text === TEXT.cooldown(6.2) && TEXT.cooldown(6.2) === 'LIGHTNING 7s');
+}
+
+// ---- Phases: MENU -> PLAYING -> WIN / LOSE ----
+{
+  const w = createWorld('normal', 1);
+  check('new world waits in MENU', w.phase === 'MENU');
+  update(w, 0.05);
+  check('nothing moves in MENU', w.time === 0 && w.enemies.length === 0);
+  check('no casting in MENU', cast(w, 'circle', null).kind === 'ignored' && castShield(w).kind === 'ignored');
+  startRound(w);
+  update(w, 0.05);
+  check('startRound -> PLAYING', w.phase === 'PLAYING' && w.time > 0);
+  update(w, 10);
+  check('dt capped at MAX_DT', Math.abs(w.time - 2 * CONFIG.MAX_DT) < 1e-9, `time ${w.time}`);
 }
 
 // ---- Lightning: 1 damage to every enemy, 10 s cooldown, cooldown costs nothing ----
@@ -95,25 +150,25 @@ function runEnemies(world: World, seconds: number): void {
   const imp = spawnEnemy(w, 'imp', 'fire', -3);
   const bird = spawnEnemy(w, 'bird', 'water', 3);
   const boss = spawnEnemy(w, 'boss', 'nature', 0);
-  const r = castSpell(w, 'zigzag', null);
+  const r = cast(w, 'zigzag', null);
   check('lightning hits all', r.hits.length === 3 && r.kind === 'kill');
   check('lightning ignores elements', near(imp.hp, 1) && near(boss.hp, CONFIG.BOSS.hp - 1));
   check('lightning kills 1-HP bird', !w.enemies.includes(bird));
   check('lightning sets cooldown', near(w.lightningCooldown, CONFIG.LIGHTNING_COOLDOWN_S));
   w.combo = 3;
-  const again = castSpell(w, 'zigzag', null);
+  const again = cast(w, 'zigzag', null);
   check('lightning on cooldown', again.kind === 'cooldown' && near(again.cooldownLeft, CONFIG.LIGHTNING_COOLDOWN_S));
   check('cooldown keeps combo', w.combo === 3);
   check('cooldown does no damage', near(imp.hp, 1));
 
   const empty = fresh();
-  check('lightning with no enemies = miss', castSpell(empty, 'zigzag', null).kind === 'miss');
+  check('lightning with no enemies = miss', cast(empty, 'zigzag', null).kind === 'miss');
   check('missed lightning keeps it ready', empty.lightningCooldown === 0);
 
-  // Cooldown ticks down in updateWorld.
+  // Cooldown ticks down in update.
   const timed = fresh();
   timed.lightningCooldown = 1;
-  for (let i = 0; i < 30; i++) updateWorld(timed, 0.05);
+  for (let i = 0; i < 30; i++) update(timed, 0.05);
   check('cooldown ticks to 0', timed.lightningCooldown === 0);
 }
 
@@ -151,7 +206,7 @@ function runEnemies(world: World, seconds: number): void {
   const zBefore = a.pos.z;
   runEnemies(w, 2);
   check('stunned enemy frozen', a.pos.z === zBefore && a.stunT > 0 && a.stateT === 0);
-  check('line sigil = shield', castSpell(w, 'line', null).spell === 'shield');
+  check('line sigil = shield', cast(w, 'line', null).spell === 'shield');
 }
 
 // ---- Enemies at the wall: 10 damage, removed. Birds dive. ----
@@ -186,35 +241,35 @@ function runEnemies(world: World, seconds: number): void {
   const w = fresh();
   const boss = spawnEnemy(w, 'boss', 'fire', 0);
   boss.hp = 1;
-  castSpell(w, 'v', boss.id);
-  updateWorld(w, 0.01);
-  check('killing the boss wins', w.phase === 'won' && w.events.some((e) => e.type === 'gameOver'));
-  check('cast after game over ignored', castSpell(w, 'circle', null).kind === 'ignored');
+  cast(w, 'v', boss);
+  update(w, 0.01);
+  check('killing the boss wins', w.phase === 'WIN' && w.events.some((e) => e.type === 'gameOver'));
+  check('cast after game over ignored', cast(w, 'circle', null).kind === 'ignored');
 
   const lose = fresh();
   lose.castleHp = 5;
   const imp = spawnEnemy(lose, 'imp', 'fire', 0);
   imp.pos.z = CONFIG.FIELD.wallZ - 0.01;
-  updateWorld(lose, 0.05);
-  check('castle at 0 HP loses', lose.castleHp === 0 && lose.phase === 'lost');
+  update(lose, 0.05);
+  check('castle at 0 HP loses', lose.castleHp === 0 && lose.phase === 'LOSE');
 
   // Survive the round: the "player" clears the field every frame, so no damage -> 3 clean waves.
   const win = fresh();
-  while (win.phase === 'playing') {
-    updateWorld(win, 1 / 60);
+  while (win.phase === 'PLAYING') {
+    update(win, 1 / 60);
     win.enemies = win.enemies.filter((e) => e.type === 'boss');
     for (const e of win.enemies) e.pos.z = CONFIG.FIELD.spawnZ; // boss never arrives
   }
-  check('surviving 90 s wins', win.phase === 'won' && win.time >= CONFIG.ROUND_SECONDS);
+  check('surviving 90 s wins', win.phase === 'WIN' && win.time >= CONFIG.ROUND_SECONDS);
   check('3 clean waves = +1500', win.score === 3 * CONFIG.CLEAN_WAVE_BONUS, `score ${win.score}`);
 
   // Damage in wave 1 loses only that wave's bonus.
   const hurt = fresh();
-  updateWorld(hurt, 0.05);
+  update(hurt, 0.05);
   hurt.castleHp -= 10;
   hurt.waveDamaged = true;
   while (hurt.time < CONFIG.WAVE_SECONDS + 1) {
-    updateWorld(hurt, 1 / 60);
+    update(hurt, 1 / 60);
     hurt.enemies = [];
   }
   check('damaged wave gets no bonus', hurt.score === 0 && hurt.wave === 2, `score ${hurt.score}`);
@@ -225,7 +280,6 @@ function runEnemies(world: World, seconds: number): void {
   const w = fresh();
   const a = spawnEnemy(w, 'imp', 'fire', -6);
   const b = spawnEnemy(w, 'imp', 'fire', 6);
-  const fakeProject = (e: { pos: { x: number } }) => ({ x: 500 + e.pos.x * 50, y: 300 });
   check('target left', pickTarget(w, { x: 250, y: 300 }, fakeProject) === a.id);
   check('target right', pickTarget(w, { x: 700, y: 280 }, fakeProject) === b.id);
   check('off-screen skipped', pickTarget(w, { x: 250, y: 300 }, (e) => (e.id === a.id ? null : fakeProject(e))) === b.id);

@@ -1,11 +1,30 @@
-// Plain data types for the game logic. No three.js, no DOM: the renderer and UI only READ these.
-import type { Difficulty } from '../config.ts';
+// Plain data types for the game logic, plus the element rule. No three.js, no DOM:
+// the renderer and UI only READ these.
+import { CONFIG, type Difficulty } from '../config.ts';
 
 export type Element = 'fire' | 'water' | 'nature';
+
+/** Rock-paper-scissors: each element beats one other. Water > Fire > Nature > Water. */
+export const BEATS: Record<Element, Element> = {
+  water: 'fire',
+  fire: 'nature',
+  nature: 'water',
+};
+
+/**
+ * How well a spell's element works on an enemy's element (damage multiplier):
+ * 2 = super effective (the spell beats it), 0.5 = resisted (same element), 1 = normal.
+ */
+export function effectiveness(spell: Element, enemy: Element): number {
+  if (BEATS[spell] === enemy) return CONFIG.DMG_STRONG;
+  if (spell === enemy) return CONFIG.DMG_WEAK;
+  return 1;
+}
 export type EnemyType = 'imp' | 'bird' | 'warlock' | 'boss';
 /** walk = moving to the wall, charge = warlock charging a blast, recharge = warlock waiting after a blast. */
 export type EnemyState = 'walk' | 'charge' | 'recharge';
-export type Phase = 'playing' | 'won' | 'lost';
+/** MENU = title / difficulty screen (nothing moves), PLAYING = round running, WIN / LOSE = end banner. */
+export type Phase = 'MENU' | 'PLAYING' | 'WIN' | 'LOSE';
 export type SpellName = 'water' | 'fire' | 'nature' | 'lightning' | 'shield';
 
 /** World units, three.js axes: x = sideways, y = height, z = depth (negative = out in the field). */
@@ -40,7 +59,16 @@ export interface Enemy {
   age: number;
 }
 
-/** Things that happened during the last updateWorld() call, for UI, camera shake and sound. */
+/** Floating text for the UI ("SUPER EFFECTIVE!", "MISS", "+300"...).
+ *  pos = world position over an enemy (the renderer projects it); null = show it at the stroke centre. */
+export interface FloatText {
+  text: string;
+  pos: Vec3 | null;
+  /** great = super effective / kill, good = block, bad = miss / fizzle / resisted, info = cooldown. */
+  tone: 'great' | 'good' | 'bad' | 'info';
+}
+
+/** Things that happened in the game, for UI, camera shake and sound. Read them with takeEvents(). */
 export type GameEvent =
   | { type: 'waveStart'; wave: number }
   | { type: 'cleanWave'; wave: number; bonus: number }
@@ -50,7 +78,8 @@ export type GameEvent =
   | { type: 'bossArrive'; enemyId: number }
   | { type: 'bossWarning'; enemyId: number; nextElement: Element }
   | { type: 'bossSwap'; enemyId: number; element: Element }
-  | { type: 'gameOver'; result: 'won' | 'lost' };
+  | { type: 'gameOver'; result: 'WIN' | 'LOSE' }
+  | ({ type: 'floatText' } & FloatText);
 
 /** Spawn timers (absolute world.time in seconds; Infinity = this type is off). Used by waves.ts. */
 export interface SpawnState {
@@ -88,7 +117,7 @@ export interface World {
   spawn: SpawnState;
   /** Random generator state (seeded, so tests are reproducible). */
   rng: number;
-  /** Events from the last updateWorld() call. Cleared at the start of each update. */
+  /** Events since the last takeEvents() call (from update() and from spells). */
   events: GameEvent[];
   /** Totals for tests and the end screen. */
   stats: { spawned: Record<EnemyType, number>; kills: number };
