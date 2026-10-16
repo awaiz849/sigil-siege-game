@@ -3,14 +3,24 @@
 import type { Point } from '../events.ts';
 import { makeTemplate, type Template } from './dollar.ts';
 
-/** Every name the recognizer can return (besides null). */
-export type SigilName = 'line' | 'v' | 'zigzag' | 'C' | 'L';
-export const SIGIL_NAMES: SigilName[] = ['line', 'v', 'zigzag', 'C', 'L'];
+/** Every name the recognizer can return (besides null).
+ *  Wizard (level 1): C, L (mirrored L), v, zigzag (W), line.
+ *  Grand Warden (level 2): cousins of those shapes: U (cup), Z, peak (Λ), M, line. */
+export type SigilName = 'line' | 'v' | 'zigzag' | 'C' | 'L' | 'U' | 'Z' | 'peak' | 'M';
+export const SIGIL_NAMES: SigilName[] = ['line', 'v', 'zigzag', 'C', 'L', 'U', 'Z', 'peak', 'M'];
+
+/** Which hero draws which shapes. $1 ignores rotation, so each hero only matches his own set
+ *  (a U is a C turned round, an M a W upside down: never in the same set). */
+export type Hero = 'wizard' | 'warden';
+export const HERO_SHAPES: Record<Hero, SigilName[]> = {
+  wizard: ['C', 'L', 'v', 'zigzag'],
+  warden: ['U', 'Z', 'peak', 'M'],
+};
 
 /** Closed shapes end near where they started; open shapes do not.
  *  C (water) is in both lists: a C is open, but a full circle also counts as water. */
 export const CLOSED_SHAPES: SigilName[] = ['C'];
-export const OPEN_SHAPES: SigilName[] = ['v', 'zigzag', 'L', 'C'];
+export const OPEN_SHAPES: SigilName[] = ['v', 'zigzag', 'L', 'C', 'U', 'Z', 'peak', 'M'];
 
 /** Circle starting at the top. sweepDeg < 360 = left a gap, > 360 = went round too far
  *  (both are common when drawing in the air). Increasing angle = clockwise on screen (y down). */
@@ -61,6 +71,35 @@ function zigzag(valleys: number, rightToLeft = false): Point[] {
   return rightToLeft ? pts.reverse() : pts;
 }
 
+/** U (cup): down the left side, round the bottom, up the right side. depth = straight sides. */
+function cup(depth: number, rightToLeft = false): Point[] {
+  const pts: Point[] = [{ x: -1, y: -depth }];
+  for (let i = 0; i <= 18; i++) {
+    const a = Math.PI - (i / 18) * Math.PI; // left -> bottom -> right (y down on screen)
+    pts.push({ x: Math.cos(a), y: Math.sin(a) });
+  }
+  pts.push({ x: 1, y: -depth });
+  return rightToLeft ? pts.reverse() : pts;
+}
+
+/** Z: along the top to the right, diagonally down to the bottom-left, along the bottom to the right. */
+function zed(width: number, reverse = false): Point[] {
+  const pts = [{ x: -width, y: -1 }, { x: width, y: -1 }, { x: -width, y: 1 }, { x: width, y: 1 }];
+  return reverse ? pts.reverse() : pts;
+}
+
+/** Λ (peak): up from the bottom-left to a sharp top, down to the bottom-right. */
+function peak(halfWidth: number, rightToLeft = false): Point[] {
+  const pts = [{ x: -halfWidth, y: 1 }, { x: 0, y: -1 }, { x: halfWidth, y: 1 }];
+  return rightToLeft ? pts.reverse() : pts;
+}
+
+/** M: starts at the bottom, alternates top/bottom (a W upside down). */
+function emm(rightToLeft = false): Point[] {
+  const pts = [-1, -0.5, 0, 0.5, 1].map((x, i) => ({ x, y: i % 2 === 0 ? 1 : -1 }));
+  return rightToLeft ? pts.reverse() : pts;
+}
+
 export function builtInTemplates(): Template[] {
   return [
     makeTemplate('C', cShape(270)), // classic C
@@ -82,5 +121,23 @@ export function builtInTemplates(): Template[] {
     makeTemplate('zigzag', zigzag(2, true)),
     makeTemplate('zigzag', zigzag(3)), // 3 valleys
     makeTemplate('zigzag', zigzag(3, true)),
+    // Grand Warden (level 2)
+    makeTemplate('U', cup(0.6)), // classic cup
+    makeTemplate('U', cup(0)), // shallow bowl
+    makeTemplate('U', cup(1.2)), // deep
+    makeTemplate('U', cup(0.6, true)), // right-to-left
+    makeTemplate('U', cup(0.3)),
+    makeTemplate('U', cup(0.3, true)),
+    makeTemplate('U', cup(0.9, true)), // deep, right-to-left (else it can pass for a 7)
+    makeTemplate('U', cup(1.2, true)),
+    makeTemplate('Z', zed(0.8)),
+    makeTemplate('Z', zed(0.5)), // narrow
+    makeTemplate('Z', zed(1.2)), // wide
+    makeTemplate('Z', zed(0.8, true)), // drawn backwards
+    makeTemplate('peak', peak(0.45)),
+    makeTemplate('peak', peak(0.25)), // narrow
+    makeTemplate('peak', peak(0.45, true)), // right-to-left
+    makeTemplate('M', emm()),
+    makeTemplate('M', emm(true)),
   ];
 }

@@ -80,10 +80,31 @@ for (let k = 0; k < 6; k++) {
   cases.push(['line', humanize([{ x: -1, y: 0 }, { x: 1, y: 0 }], { tilt: between(-60, 60), noise: 0.01 })]);
 }
 
+// Grand Warden (level 2): his own shapes, classified against his set only.
+const cupPts = (depth: number) => [{ x: -1, y: -depth }, ...circle(180, false, 180), { x: 1, y: -depth }];
+const wardenCases: Array<[string, Point[]]> = [];
+for (let k = 0; k < 6; k++) {
+  wardenCases.push(['U', humanize(cupPts(between(0.3, 0.9)))]);
+  wardenCases.push(['U', humanize(cupPts(between(0.2, 0.8)).reverse())]); // right-to-left
+  wardenCases.push(['U', humanize(cupPts(between(0.3, 0.8)), { noise: 0.07 })]); // shaky
+  wardenCases.push(['Z', humanize([{ x: -0.8, y: -1 }, { x: 0.8, y: -1 }, { x: -0.8, y: 1 }, { x: 0.8, y: 1 }])]);
+  wardenCases.push(['Z', humanize([{ x: -0.5, y: -1 }, { x: 0.5, y: -1 }, { x: -0.5, y: 1 }, { x: 0.5, y: 1 }])]); // narrow
+  wardenCases.push(['Z', humanize([{ x: 0.8, y: 1 }, { x: -0.8, y: 1 }, { x: 0.8, y: -1 }, { x: -0.8, y: -1 }])]); // backwards
+  wardenCases.push(['peak', humanize([{ x: -0.45, y: 1 }, { x: 0, y: -1 }, { x: 0.45, y: 1 }])]);
+  wardenCases.push(['peak', humanize([{ x: -0.25, y: 1 }, { x: 0, y: -1 }, { x: 0.25, y: 1 }])]); // narrow
+  wardenCases.push(['peak', humanize([{ x: 0.45, y: 1 }, { x: 0, y: -1 }, { x: -0.45, y: 1 }])]); // right-to-left
+  wardenCases.push(['M', humanize([{ x: -1, y: 1 }, { x: -0.5, y: -1 }, { x: 0, y: 1 }, { x: 0.5, y: -1 }, { x: 1, y: 1 }])]);
+  wardenCases.push(['M', humanize([{ x: 1, y: 1 }, { x: 0.5, y: -1 }, { x: 0, y: 1 }, { x: -0.5, y: -1 }, { x: -1, y: 1 }])]);
+  wardenCases.push(['line', humanize([{ x: 0, y: -1 }, { x: 0, y: 1 }], { tilt: between(-40, 40), noise: 0.01 })]);
+}
+
 let failures = 0;
 const tally: Record<string, { ok: number; total: number; minScore: number }> = {};
-for (const [expected, points] of cases) {
-  const result = classify(points);
+for (const [expected, points, hero] of [
+  ...cases.map(([n, p]) => [n, p, 'wizard'] as const),
+  ...wardenCases.map(([n, p]) => [n, p, 'warden'] as const),
+]) {
+  const result = classify(points, hero);
   const row = (tally[expected] ??= { ok: 0, total: 0, minScore: 1 });
   row.total++;
   if (result.name === expected) {
@@ -101,12 +122,14 @@ for (let k = 0; k < 20; k++) {
   const scribble: Point[] = [];
   for (let i = 0; i < 12; i++) scribble.push({ x: between(-1, 1), y: between(-1, 1) });
   if (classify(humanize(scribble)).name !== null) scribbleCasts++;
+  if (classify(humanize(scribble), 'warden').name !== null) scribbleCasts++;
 }
 
 for (const [name, r] of Object.entries(tally)) {
   console.log(`${name.padEnd(9)} ${r.ok}/${r.total}  lowest correct score ${r.minScore.toFixed(2)}`);
 }
-console.log(`random scribbles that still cast a spell: ${scribbleCasts}/20`);
+console.log(`random scribbles that still cast a spell: ${scribbleCasts}/40 (wizard + warden)`);
 
-if (failures > 0) throw new Error(`${failures} of ${cases.length} strokes misclassified`);
-console.log(`ALL ${cases.length} strokes classified correctly`);
+const total = cases.length + wardenCases.length;
+if (failures > 0) throw new Error(`${failures} of ${total} strokes misclassified`);
+console.log(`ALL ${total} strokes classified correctly`);
