@@ -11,6 +11,7 @@ import { toon } from './toon.ts';
 import { CONFIG } from '../config.ts';
 import type { Element, Enemy, EnemyType } from '../game/types.ts';
 import { ELEMENT_COLOR, PALETTE } from './palette.ts';
+import { createGlbEnemyModel } from './glbModels.ts';
 
 export type EnemyModel = {
   group: THREE.Group;
@@ -112,6 +113,9 @@ function limb(geo: THREE.BufferGeometry, length: number, m: THREE.Material): THR
 }
 
 export function createEnemyModel(type: EnemyType, element: Element): EnemyModel {
+  // A real 3D model file (public/models/*.glb) wins when it has been loaded.
+  const glb = createGlbEnemyModel(type, element);
+  if (glb) return glb;
   switch (type) {
     case 'imp':
       return flameWisp(element);

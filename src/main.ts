@@ -3,6 +3,7 @@
 //           -> update(world) -> render(world) -> overlay (HUD, badges, texts).
 import { CONFIG, type Difficulty } from './config.ts';
 import { createScene } from './render/scene.ts';
+import { preloadGlbModels } from './render/glbModels.ts';
 import { createOverlay } from './ui/overlay.ts';
 import { createDebugOverlay } from './ui/debugOverlay.ts';
 import { createCameraCorner } from './ui/cameraCorner.ts';
@@ -27,6 +28,8 @@ vignette.id = 'vignette';
 document.body.append(glCanvas, vignette, overlayCanvas);
 
 const world3d = createScene(glCanvas);
+// Real 3D model files (public/models/*.glb) load during the menus; missing ones fall back to code-built models.
+preloadGlbModels();
 const overlay = createOverlay(overlayCanvas);
 const debugOverlay = createDebugOverlay();
 const cameraCorner = createCameraCorner();

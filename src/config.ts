@@ -141,6 +141,16 @@ export const CONFIG = {
   /** Overlay (HUD) resolution cap: draws at the screen's real pixel density for crisp text. */
   OVERLAY_MAX_PIXEL_RATIO: 2,
   SHADOWS: false,
+  /** Real 3D models (GLB). Put files in public/models/; a missing file falls back to the code-built model.
+   *  height = how tall it stands in world units; rotationY = turn so it faces the wall (+z). */
+  GLB_MODELS: {
+    imp: { file: 'models/imp.glb', height: 3.2, rotationY: 0 },
+    bird: { file: 'models/bird.glb', height: 2.8, rotationY: 0 },
+    warlock: { file: 'models/warlock.glb', height: 3.0, rotationY: 0 },
+    boss: { file: 'models/boss.glb', height: 5.6, rotationY: 0 },
+  } as Record<'imp' | 'bird' | 'warlock' | 'boss', { file: string; height: number; rotationY: number }>,
+  /** Give GLB models toon shading so they match the comic look (false = keep their own PBR look). */
+  GLB_TOON: true,
   /** Comic ink outlines (post-process): colour, line width in pixels, fade-out distance range. */
   INK: { enabled: true, color: 0x07050f, thickness: 1.2, fadeStart: 30, fadeEnd: 70 },
   /** Glow on emissive things. Turn off first if FPS drops (after shadows). */

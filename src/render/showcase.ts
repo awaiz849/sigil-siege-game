@@ -9,6 +9,10 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { InkOutlinePass, toon } from './toon.ts';
 import type { Element, Enemy, EnemyType } from '../game/types.ts';
 import { createEnemyModel, type EnemyModel } from './models.ts';
+import { preloadGlbModels } from './glbModels.ts';
+
+// Load any GLB model files first, so the showcase shows them instead of the code-built ones.
+await preloadGlbModels();
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));

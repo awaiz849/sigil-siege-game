@@ -92,6 +92,8 @@ webcam -> MediaPipe HandLandmarker -> One Euro filter -> finger poses -> stroke
 - **Fonts**: Silkscreen (Jason Kottke) and DotGothic16 (Fontworks), SIL Open Font License 1.1.
   License texts are in `public/fonts/`.
 - **Vite** and **TypeScript** for the build.
+- **3D models** in `public/models/` (when present): source and licence of each file listed here.
+  AI-generated models are made from our own concept images with an image-to-3D tool (name it here).
 - **AI assistance**: Claude and Claude Code were used for planning and coding help.
 
 Team Velocity:

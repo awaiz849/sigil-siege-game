@@ -62,7 +62,7 @@ export function createEnemyView(scene: THREE.Scene, particles: Particles, onArch
     const flashMats = new Set<THREE.MeshToonMaterial>();
     model.group.traverse((o) => {
       const m = (o as THREE.Mesh).material;
-      if (m instanceof THREE.MeshToonMaterial && m.emissiveIntensity < 1) flashMats.add(m);
+      if ((m instanceof THREE.MeshToonMaterial || m instanceof THREE.MeshStandardMaterial) && m.emissiveIntensity < 1) flashMats.add(m as THREE.MeshToonMaterial);
     });
     const flash = [...flashMats].map((mat) => ({ mat, base: mat.emissive.clone(), baseIntensity: mat.emissiveIntensity }));
     views.set(enemy.id, { model, shadow, stunStars, element: enemy.element, flashMats: flash, hp: enemy.hp, hitT: 0, stepT: 0, state: enemy.state, last: { ...enemy, pos: { ...enemy.pos } }, spawnT: t });
