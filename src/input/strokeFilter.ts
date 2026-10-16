@@ -1,6 +1,6 @@
 // Shared by mouse and hand input: decides if a finished stroke is worth recognizing.
-import { CONFIG } from '../config';
-import type { Point } from '../events';
+import { CONFIG } from '../config.ts';
+import type { Point } from '../events.ts';
 
 /** True if the stroke has enough points and is big enough (bounding box). */
 export function isStrokeLongEnough(points: Point[]): boolean {

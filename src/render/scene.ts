@@ -1,7 +1,7 @@
 // three.js world: renderer, camera on the castle wall, and a placeholder ground.
 // Later: models, enemy meshes, and projecting enemies to screen positions.
 import * as THREE from 'three';
-import { CONFIG } from '../config';
+import { CONFIG } from '../config.ts';
 
 export function createScene(canvas: HTMLCanvasElement) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });

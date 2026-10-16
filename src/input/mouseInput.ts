@@ -1,9 +1,9 @@
 // DEBUG input only: mouse drag = stroke. Emits exactly the same events as hand input,
 // so the rest of the game cannot tell the difference.
 // Mouse position is already in overlay pixels (CSS px, origin top-left), no mirroring needed.
-import { CONFIG } from '../config';
-import { emitCursor, emitStrokeEnd, emitStrokePoint, emitStrokeStart, type Point } from '../events';
-import { isStrokeLongEnough } from './strokeFilter';
+import { CONFIG } from '../config.ts';
+import { emitCursor, emitStrokeEnd, emitStrokePoint, emitStrokeStart, type Point } from '../events.ts';
+import { isStrokeLongEnough } from './strokeFilter.ts';
 
 export function createMouseInput() {
   let enabled = false;

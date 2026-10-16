@@ -1,0 +1,101 @@
+// Recognizer test: generates "hand-drawn" strokes (noise, tilt, odd sizes, start points)
+// and checks classify() names them correctly. Run: npm run test:recognizer
+import type { Point } from '../src/events.ts';
+import { classify } from '../src/recognizer/index.ts';
+
+// Seeded random so failures are reproducible.
+let seed = 12345;
+function rand(): number {
+  seed = (seed * 1664525 + 1013904223) % 4294967296;
+  return seed / 4294967296;
+}
+const between = (a: number, b: number) => a + rand() * (b - a);
+
+/** Densify a polyline, then tilt, scale, move and jitter it like a shaky finger. */
+function humanize(vertices: Point[], opts: { tilt?: number; sx?: number; sy?: number; noise?: number } = {}): Point[] {
+  const dense: Point[] = [];
+  for (let i = 1; i < vertices.length; i++) {
+    for (let s = 0; s < 12; s++) {
+      const t = s / 12;
+      dense.push({
+        x: vertices[i - 1].x + t * (vertices[i].x - vertices[i - 1].x),
+        y: vertices[i - 1].y + t * (vertices[i].y - vertices[i - 1].y),
+      });
+    }
+  }
+  dense.push(vertices[vertices.length - 1]);
+  const tilt = ((opts.tilt ?? between(-15, 15)) * Math.PI) / 180;
+  const sx = opts.sx ?? between(80, 200);
+  const sy = opts.sy ?? sx * between(0.8, 1.2);
+  const noise = opts.noise ?? 0.03;
+  const cx = between(200, 800);
+  const cy = between(200, 500);
+  return dense.map((p) => {
+    const x = p.x + between(-noise, noise);
+    const y = p.y + between(-noise, noise);
+    return {
+      x: cx + sx * (x * Math.cos(tilt) - y * Math.sin(tilt)),
+      y: cy + sy * (x * Math.sin(tilt) + y * Math.cos(tilt)),
+    };
+  });
+}
+
+function circle(startDeg: number, clockwise: boolean, sweepDeg = 360): Point[] {
+  const pts: Point[] = [];
+  for (let i = 0; i <= 40; i++) {
+    const a = ((startDeg + (clockwise ? 1 : -1) * (i / 40) * sweepDeg) * Math.PI) / 180;
+    pts.push({ x: Math.cos(a), y: Math.sin(a) });
+  }
+  return pts;
+}
+
+const T = { x: 0, y: -1 }, R = { x: 0.87, y: 0.5 }, L = { x: -0.87, y: 0.5 };
+
+const cases: Array<[string, Point[]]> = [];
+for (let k = 0; k < 6; k++) {
+  cases.push(['circle', humanize(circle(between(0, 360), true))]);
+  cases.push(['circle', humanize(circle(between(0, 360), false))]);
+  cases.push(['circle', humanize(circle(-90, true, 320))]); // left a gap
+  cases.push(['triangle', humanize([T, R, L, T])]);
+  cases.push(['triangle', humanize([T, L, R, T])]);
+  cases.push(['triangle', humanize([L, T, R, L])]); // started bottom-left
+  cases.push(['v', humanize([{ x: -0.6, y: -1 }, { x: 0, y: 1 }, { x: 0.6, y: -1 }])]);
+  cases.push(['v', humanize([{ x: -0.3, y: -1 }, { x: 0, y: 1 }, { x: 0.3, y: -1 }])]); // narrow
+  cases.push(['v', humanize([{ x: -1.2, y: -1 }, { x: 0, y: 1 }, { x: 1.2, y: -1 }])]); // wide
+  cases.push(['v', humanize([{ x: 0.6, y: -1 }, { x: 0, y: 1 }, { x: -0.6, y: -1 }])]); // right-to-left
+  cases.push(['zigzag', humanize([{ x: -1, y: -1 }, { x: -0.5, y: 1 }, { x: 0, y: -1 }, { x: 0.5, y: 1 }, { x: 1, y: -1 }])]);
+  cases.push(['zigzag', humanize([{ x: 1, y: -1 }, { x: 0.5, y: 1 }, { x: 0, y: -1 }, { x: -0.5, y: 1 }, { x: -1, y: -1 }])]);
+  cases.push(['zigzag', humanize([{ x: -1, y: -1 }, { x: -0.67, y: 1 }, { x: -0.33, y: -1 }, { x: 0, y: 1 }, { x: 0.33, y: -1 }, { x: 0.67, y: 1 }, { x: 1, y: -1 }])]);
+  cases.push(['line', humanize([{ x: -1, y: 0 }, { x: 1, y: 0 }], { tilt: between(-60, 60), noise: 0.01 })]);
+}
+
+let failures = 0;
+const tally: Record<string, { ok: number; total: number; minScore: number }> = {};
+for (const [expected, points] of cases) {
+  const result = classify(points);
+  const row = (tally[expected] ??= { ok: 0, total: 0, minScore: 1 });
+  row.total++;
+  if (result.name === expected) {
+    row.ok++;
+    row.minScore = Math.min(row.minScore, result.score);
+  } else {
+    failures++;
+    console.log(`FAIL expected ${expected}, got ${result.name} (score ${result.score.toFixed(2)})`);
+  }
+}
+
+// Garbage should FIZZLE, not cast a spell.
+let scribbleCasts = 0;
+for (let k = 0; k < 20; k++) {
+  const scribble: Point[] = [];
+  for (let i = 0; i < 12; i++) scribble.push({ x: between(-1, 1), y: between(-1, 1) });
+  if (classify(humanize(scribble)).name !== null) scribbleCasts++;
+}
+
+for (const [name, r] of Object.entries(tally)) {
+  console.log(`${name.padEnd(9)} ${r.ok}/${r.total}  lowest correct score ${r.minScore.toFixed(2)}`);
+}
+console.log(`random scribbles that still cast a spell: ${scribbleCasts}/20`);
+
+if (failures > 0) throw new Error(`${failures} of ${cases.length} strokes misclassified`);
+console.log(`ALL ${cases.length} strokes classified correctly`);

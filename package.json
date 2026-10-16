@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:recognizer": "node tests/recognizer.test.ts",
+    "test": "npm run test:recognizer"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^1.1.1",

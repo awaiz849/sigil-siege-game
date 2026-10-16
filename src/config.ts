@@ -23,6 +23,10 @@ export const CONFIG = {
 
   // ---- Recognizer ----
   RECOGNIZER_THRESHOLD: 0.8,
+  /** Precheck: end-to-end distance / path length at or above this = line. */
+  LINE_STRAIGHTNESS: 0.95,
+  /** Precheck: end gap below this fraction of the bounding-box diagonal = closed shape. */
+  CLOSED_GAP_RATIO: 0.25,
 
   // ---- Castle and scoring ----
   CASTLE_HP: 100,
