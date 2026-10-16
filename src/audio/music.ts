@@ -1,5 +1,5 @@
 // Synthesized background music for the night siege (Web Audio, no audio files):
-//   ambience  howling wind (filtered noise, slowly gusting), always on
+//   ambience  soft low wind (low-passed noise, slowly gusting), quiet (CONFIG.MUSIC_WIND)
 //   pad       a dark minor chord that slowly swells and shifts (A minor -> F -> G -> E)
 //   drums     war drums; tempo and density rise with the intensity level (wave / boss)
 // setMusicIntensity(0..4): 0 = menus (wind + soft pad), 1-3 = waves, 4 = boss.
@@ -56,7 +56,7 @@ export function setMusicIntensity(level: number) {
   const t = a.ctx.currentTime;
   // The pad opens up (brighter) and the wind drops a little as the fight intensifies.
   padFilter.frequency.setTargetAtTime(400 + intensity * 250, t, 1.5);
-  windGain.gain.setTargetAtTime(0.18 - intensity * 0.025, t, 2);
+  windGain.gain.setTargetAtTime(CONFIG.MUSIC_WIND * (1 - intensity * 0.15), t, 2);
 }
 
 function start(a: { ctx: AudioContext; master: GainNode; noise: AudioBuffer }) {
@@ -71,16 +71,16 @@ function start(a: { ctx: AudioContext; master: GainNode; noise: AudioBuffer }) {
   windSrc.buffer = noise;
   windSrc.loop = true;
   const windFilter = ctx.createBiquadFilter();
-  windFilter.type = 'bandpass';
-  windFilter.frequency.value = 500;
-  windFilter.Q.value = 0.8;
+  windFilter.type = 'lowpass';
+  windFilter.frequency.value = 380;
+  windFilter.Q.value = 0.5;
   const gust = ctx.createOscillator();
   gust.frequency.value = 0.07;
   const gustDepth = ctx.createGain();
-  gustDepth.gain.value = 300;
+  gustDepth.gain.value = 150;
   gust.connect(gustDepth).connect(windFilter.frequency);
   windGain = ctx.createGain();
-  windGain.gain.value = 0.18;
+  windGain.gain.value = CONFIG.MUSIC_WIND;
   windSrc.connect(windFilter).connect(windGain).connect(out);
   windSrc.start();
   gust.start();

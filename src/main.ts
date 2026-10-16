@@ -103,6 +103,13 @@ const screens = createScreens({
   mouseMode: () => mouse.isEnabled(),
   camera: () => camera,
   onStart: newRound,
+  playing: () => world.phase === 'PLAYING',
+  onRestart: () => newRound(world.difficulty),
+  // Leave the round: an empty world in the menu (the 3D scene clears its monsters).
+  onExit: () => {
+    world = createWorld(world.difficulty);
+    setMusicIntensity(0);
+  },
 });
 
 // ---- Casting: stroke -> recognizer -> spell on the enemy nearest the stroke centre ----
@@ -126,7 +133,7 @@ onStrokeEnd((points) => {
 
 // Open palm = shield, instantly.
 onPalm(() => {
-  if (world.phase === 'PLAYING') showCast(castShield(world));
+  if (world.phase === 'PLAYING' && !screens.current) showCast(castShield(world));
 });
 
 /** 3D + overlay feedback for a cast (texts arrive separately, as game events). */
@@ -195,11 +202,18 @@ function frame(now: number) {
   hand?.update();
   screens.update(now);
   updateMusic();
-  update(world, dt);
+  // Paused: the round and the 3D scene freeze (time stands still).
+  const paused = screens.current === 'pause';
+  if (!paused) update(world, dt);
   handleEvents(takeEvents(world));
-  world3d.render(world, dt);
-  // HUD only during a round; menus draw over the live 3D scene.
-  overlay.draw(world.phase === 'MENU' || screens.current ? null : world, view, now, screens.current ? (ctx) => screens.draw(ctx, now) : null);
+  world3d.render(world, paused ? 0 : dt);
+  // HUD (+ pause button) only during a round; menus draw over the live 3D scene.
+  overlay.draw(
+    world.phase === 'MENU' || screens.current ? null : world,
+    view,
+    now,
+    screens.current ? (ctx) => screens.draw(ctx, now) : (ctx) => screens.drawGameButtons(ctx),
+  );
   debugOverlay.tick(now);
   // Live camera in the corner during play (the debug overlay has its own bigger one).
   if (hand && !screens.current && !debugOverlay.isVisible()) cameraCorner.draw(overlay.ctx, hand);

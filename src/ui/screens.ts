@@ -1,8 +1,11 @@
-// Hands-free screens, all on the overlay canvas over the live 3D scene:
+// Screens, all on the overlay canvas over the live 3D scene:
 //   handCheck  show palm, then point (live camera preview + skeleton)   -> title
-//   title      hover a difficulty button 0.8 s to pick it, hold palm 1.2 s to start
-//   end        victory / defeat, score + stats, hold palm to play again, or hover to change difficulty
-// Nothing here needs a click: buttons use dwell.ts, confirming uses palmHold.ts.
+//   title      hover a difficulty button 0.8 s to pick it, hold palm 1.2 s (or hover START) to start
+//   pause      RESUME / RESTART / EXIT TO MENU; hold palm to resume
+//   end        victory / defeat, score + stats, PLAY AGAIN / CHANGE DIFFICULTY, hold palm to play again
+// Everything works hands-free (dwell.ts buttons + palmHold.ts). Mouse clicks and keys work too:
+//   click a button; title: 1/2/3 or arrows pick, Enter/Space starts; in game: Esc/P pauses;
+//   pause: Esc/P/Enter resumes; end: Enter plays again, Esc goes to the menu.
 import { CONFIG, type Difficulty } from '../config.ts';
 import { onCursor, type Pose } from '../events.ts';
 import type { World } from '../game/types.ts';
@@ -14,7 +17,7 @@ import { drawHandPreview } from './debugOverlay.ts';
 import { FONT_TEXT, FONT_TITLE } from './fonts.ts';
 import { drawPalm, drawSigil, ELEMENT_CSS, GOLD, NAVY, roundRect } from './icons.ts';
 
-export type ScreenName = 'handCheck' | 'title' | 'end';
+export type ScreenName = 'handCheck' | 'title' | 'pause' | 'end';
 export type CameraState = 'loading' | 'ready' | 'failed';
 
 type Opts = {
@@ -22,6 +25,11 @@ type Opts = {
   mouseMode: () => boolean;
   camera: () => CameraState;
   onStart: (difficulty: Difficulty) => void;
+  /** True while a round is running (the in-game pause button is live then). */
+  playing: () => boolean;
+  /** Pause menu: start the same difficulty over / leave the round for the title screen. */
+  onRestart: () => void;
+  onExit: () => void;
 };
 
 const DIFFICULTIES: Difficulty[] = ['easy', 'normal', 'hard'];
@@ -54,37 +62,118 @@ export function createScreens(opts: Opts) {
     const total = bw * 3 + gap * 2;
     return { x: W / 2 - total / 2 + i * (bw + gap), y: H * 0.56, w: bw, h: bh };
   }
-  function changeDifficultyRect(): Rect {
+  /** Buttons stacked in the middle of the screen (pause menu, end screen). */
+  function stackRect(i: number, y0: number): Rect {
     const s = scale();
-    return { x: W / 2 - 160 * s, y: H * 0.78, w: 320 * s, h: 56 * s };
+    return { x: W / 2 - 160 * s, y: y0 + i * 70 * s, w: 320 * s, h: 56 * s };
+  }
+  function startRect(): Rect {
+    const s = scale();
+    return { x: W / 2 - 130 * s, y: H * 0.56 + 92 * s, w: 260 * s, h: 56 * s };
+  }
+  /** In-game pause button, top right under the score panel. */
+  function pauseRect(): Rect {
+    const s = scale();
+    return { x: W - 16 * s - 150 * s, y: 84 * s, w: 150 * s, h: 44 * s };
   }
   const offscreen: Rect = { x: -1e6, y: -1e6, w: 0, h: 0 };
 
-  // Dwell buttons: only "live" on their own screen.
+  // ---- actions (shared by hover, click and keys)
+  function pickDifficulty(d: Difficulty) {
+    difficulty = d;
+    sound.select();
+  }
+  function start() {
+    sound.start();
+    screen = null;
+    opts.onStart(difficulty);
+  }
+  function pause() {
+    if (screen !== null || !opts.playing()) return;
+    sound.select();
+    show('pause');
+  }
+  function resume() {
+    sound.select();
+    screen = null;
+  }
+  function restart() {
+    sound.start();
+    screen = null;
+    opts.onRestart();
+  }
+  function exitToMenu() {
+    sound.select();
+    opts.onExit();
+    show('title');
+  }
+
+  // ---- buttons: each is live only on its own screen; hover (dwell) or click presses it.
+  type Button = { rect: () => Rect; label: string; action: () => void; dwell: ReturnType<typeof createDwell> };
+  function makeButton(on: () => boolean, rect: () => Rect, label: string, action: () => void, seconds?: number): Button {
+    const live = () => (on() ? rect() : offscreen);
+    return { rect: live, label, action, dwell: createDwell(live, action, seconds) };
+  }
   const difficultyButtons = DIFFICULTIES.map((d, i) =>
-    createDwell(
-      () => (screen === 'title' ? difficultyRect(i) : offscreen),
-      () => {
-        difficulty = d;
-        sound.select();
-      },
-    ),
+    makeButton(() => screen === 'title', () => difficultyRect(i), d.toUpperCase(), () => pickDifficulty(d)),
   );
-  const changeButton = createDwell(
-    () => (screen === 'end' ? changeDifficultyRect() : offscreen),
-    () => {
+  const startButton = makeButton(() => screen === 'title', startRect, 'START', start);
+  const pauseButtons = [
+    makeButton(() => screen === 'pause', () => stackRect(0, H * 0.38), 'RESUME', resume),
+    makeButton(() => screen === 'pause', () => stackRect(1, H * 0.38), 'RESTART', restart),
+    makeButton(() => screen === 'pause', () => stackRect(2, H * 0.38), 'EXIT TO MENU', exitToMenu),
+  ];
+  const endButtons = [
+    makeButton(() => screen === 'end', () => stackRect(0, H * 0.72), 'PLAY AGAIN', start),
+    makeButton(() => screen === 'end', () => stackRect(1, H * 0.72), 'CHANGE DIFFICULTY', () => {
       sound.select();
       show('title');
-    },
-  );
+    }),
+  ];
+  // In game: a longer hover, so aiming near the corner never pauses by accident.
+  const pauseGameButton = makeButton(() => screen === null && opts.playing(), pauseRect, 'II  PAUSE', pause, CONFIG.PAUSE_HOVER_S);
+  const allButtons = [...difficultyButtons, startButton, ...pauseButtons, ...endButtons, pauseGameButton];
 
-  // Hold palm: start (title) or play again (end).
-  const palmHold = createPalmHold(() => {
-    if (screen === 'title' || screen === 'end') {
-      sound.start();
-      screen = null;
-      opts.onStart(difficulty);
+  // Mouse: a left click on a live button presses it (overlay pixels = CSS pixels).
+  window.addEventListener('click', (e) => {
+    if (e.button !== 0) return;
+    for (const b of allButtons) {
+      const r = b.rect();
+      if (e.clientX >= r.x && e.clientX <= r.x + r.w && e.clientY >= r.y && e.clientY <= r.y + r.h) {
+        b.action();
+        return;
+      }
     }
+  });
+
+  // Keyboard shortcuts for every screen (debug keys D / M / R stay in main.ts).
+  window.addEventListener('keydown', (e) => {
+    const confirm = e.key === 'Enter' || e.key === ' ';
+    const back = e.key === 'Escape' || e.key === 'p' || e.key === 'P';
+    if (screen === 'handCheck' && confirm) show('title');
+    else if (screen === 'title') {
+      const i = DIFFICULTIES.indexOf(difficulty);
+      if (e.key >= '1' && e.key <= '3') pickDifficulty(DIFFICULTIES[Number(e.key) - 1]);
+      else if (e.key === 'ArrowLeft') pickDifficulty(DIFFICULTIES[Math.max(0, i - 1)]);
+      else if (e.key === 'ArrowRight') pickDifficulty(DIFFICULTIES[Math.min(2, i + 1)]);
+      else if (confirm) start();
+      else return;
+    } else if (screen === 'pause' && (back || confirm)) resume();
+    else if (screen === 'end' && confirm) start();
+    else if (screen === 'end' && e.key === 'Escape') show('title');
+    else if (screen === null && back) pause();
+    else return;
+    e.preventDefault();
+  });
+  // Switching tabs / windows mid-round pauses the game.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) pause();
+  });
+
+  // Hold palm: start (title), play again (end) or resume (pause).
+  const palmHold = createPalmHold(() => {
+    if (screen === 'title' || screen === 'end') start();
+    else if (screen === 'pause') resume();
   });
 
   function show(name: ScreenName, world?: World) {
@@ -146,8 +235,7 @@ export function createScreens(opts: Opts) {
       const dt = Math.min(0.1, (now - lastNow) / 1000);
       lastNow = now;
       if (screen === 'handCheck') updateHandCheck(dt);
-      difficultyButtons.forEach((b) => b.update(now));
-      changeButton.update(now);
+      allButtons.forEach((b) => b.dwell.update(now));
       palmHold.update(now);
     },
 
@@ -170,7 +258,20 @@ export function createScreens(opts: Opts) {
       ctx.textBaseline = 'middle';
       if (screen === 'handCheck') drawHandCheck(ctx, s, now);
       else if (screen === 'title') drawTitle(ctx, s, now);
+      else if (screen === 'pause') drawPause(ctx, s, now);
       else drawEnd(ctx, s, now);
+      ctx.restore();
+    },
+
+    /** During a round: the pause button (hover, click, or Esc / P). */
+    drawGameButtons(ctx: CanvasRenderingContext2D) {
+      if (screen !== null || !opts.playing()) return;
+      W = ctx.canvas.clientWidth;
+      H = ctx.canvas.clientHeight;
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      drawButton(ctx, pauseGameButton, false, scale(), 18);
       ctx.restore();
     },
   };
@@ -279,13 +380,22 @@ export function createScreens(opts: Opts) {
     // Difficulty buttons (hover to pick).
     ctx.font = `${16 * s}px ${FONT_TITLE}`;
     ctx.fillStyle = '#e8e2ff';
-    ctx.fillText('HOVER TO CHOOSE DIFFICULTY', W / 2, H * 0.56 - 22 * s);
+    ctx.fillText('HOVER OR CLICK TO CHOOSE DIFFICULTY', W / 2, H * 0.56 - 22 * s);
     DIFFICULTIES.forEach((d, i) => {
       const r = difficultyRect(i);
-      button(ctx, r, d.toUpperCase(), difficulty === d, difficultyButtons[i].progress, s, `best ${bestScore(d)}`);
+      button(ctx, r, d.toUpperCase(), difficulty === d, difficultyButtons[i].dwell.progress, s, `best ${bestScore(d)}`);
     });
+    drawButton(ctx, startButton, true, s);
 
-    confirmPrompt(ctx, s, now, H * 0.82, 'TO START');
+    confirmPrompt(ctx, s, now, H * 0.56 + 186 * s, 'TO START', 'or press ENTER');
+  }
+
+  // ---------------------------------------------------------------- pause
+
+  function drawPause(ctx: CanvasRenderingContext2D, s: number, now: number) {
+    title(ctx, 'PAUSED', H * 0.24, 72 * s, GOLD);
+    pauseButtons.forEach((b, i) => drawButton(ctx, b, i === 0, s));
+    confirmPrompt(ctx, s, now, H * 0.38 + 240 * s, 'TO RESUME', 'or press ESC');
   }
 
   // ---------------------------------------------------------------- end
@@ -338,8 +448,8 @@ export function createScreens(opts: Opts) {
       ctx.fillText(v, x, cy + 172 * s);
     });
 
-    confirmPrompt(ctx, s, now, H * 0.66, 'TO PLAY AGAIN');
-    button(ctx, changeDifficultyRect(), 'CHANGE DIFFICULTY', false, changeButton.progress, s);
+    confirmPrompt(ctx, s, now, H * 0.62, 'TO PLAY AGAIN', 'or press ENTER');
+    endButtons.forEach((b, i) => drawButton(ctx, b, i === 0, s));
   }
 
   // ---------------------------------------------------------------- widgets
@@ -357,8 +467,12 @@ export function createScreens(opts: Opts) {
     ctx.fillText(text, W / 2, y);
   }
 
+  function drawButton(ctx: CanvasRenderingContext2D, b: Button, selected: boolean, s: number, fontPx = 22) {
+    button(ctx, b.rect(), b.label, selected, b.dwell.progress, s, undefined, fontPx);
+  }
+
   /** Dwell button: fills from the bottom while the cursor hovers. */
-  function button(ctx: CanvasRenderingContext2D, r: Rect, label: string, selected: boolean, progress: number, s: number, sub?: string) {
+  function button(ctx: CanvasRenderingContext2D, r: Rect, label: string, selected: boolean, progress: number, s: number, sub?: string, fontPx = 22) {
     roundRect(ctx, r.x, r.y, r.w, r.h, 10 * s);
     ctx.fillStyle = selected ? 'rgba(242,193,78,0.25)' : 'rgba(13,11,36,0.85)';
     ctx.fill();
@@ -374,7 +488,7 @@ export function createScreens(opts: Opts) {
     ctx.strokeStyle = selected ? GOLD : 'rgba(242,193,78,0.45)';
     ctx.lineWidth = (selected ? 4 : 2) * s;
     ctx.stroke();
-    ctx.font = `700 ${22 * s}px ${FONT_TITLE}`;
+    ctx.font = `700 ${fontPx * s}px ${FONT_TITLE}`;
     ctx.fillStyle = selected ? GOLD : '#ffffff';
     ctx.fillText(label, r.x + r.w / 2, r.y + r.h / 2 - (sub ? 8 * s : 0));
     if (sub) {
@@ -385,9 +499,14 @@ export function createScreens(opts: Opts) {
   }
 
   /** "Hold your open palm" with a palm icon whose ring fills up. */
-  function confirmPrompt(ctx: CanvasRenderingContext2D, s: number, now: number, y: number, what: string) {
+  function confirmPrompt(ctx: CanvasRenderingContext2D, s: number, now: number, y: number, what: string, keyHint?: string) {
     const mouse = opts.mouseMode();
     const text = mouse ? `HOLD RIGHT MOUSE BUTTON ${what}` : `HOLD YOUR OPEN PALM ${what}`;
+    if (keyHint) {
+      ctx.font = `${13 * s}px ${FONT_TEXT}`;
+      ctx.fillStyle = '#b8b0d8';
+      ctx.fillText(keyHint, W / 2, y + 28 * s);
+    }
     ctx.font = `${22 * s}px ${FONT_TITLE}`;
     const tw = ctx.measureText(text).width;
     const ix = W / 2 - tw / 2 - 34 * s;

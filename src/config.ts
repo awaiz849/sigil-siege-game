@@ -34,6 +34,8 @@ export const CONFIG = {
   /** Hold times for hands-free menus. */
   PALM_HOLD_START_S: 1.2,
   HOVER_SELECT_S: 0.8,
+  /** In-game pause button: longer hover, so aiming near the corner never pauses by accident. */
+  PAUSE_HOVER_S: 1.2,
 
   // ---- Recognizer ----
   RECOGNIZER_THRESHOLD: 0.8,
@@ -118,6 +120,8 @@ export const CONFIG = {
   VOLUME: 0.6,
   /** Background music + night ambience volume (relative to VOLUME). 0 = off. */
   MUSIC_VOLUME: 0.45,
+  /** Soft wind under the music (filtered noise). Kept low: loud, it sounds like a hiss in the menus. 0 = off. */
+  MUSIC_WIND: 0.04,
   /** Music tempo per intensity level: 0 menu, 1 wave 1, 2 wave 2, 3 wave 3, 4 boss. */
   MUSIC_BPM: [0, 72, 84, 96, 112],
 
