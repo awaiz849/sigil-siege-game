@@ -6,7 +6,7 @@ import { effectiveness } from '../src/game/types.ts';
 import type { Enemy, World } from '../src/game/types.ts';
 import { createWorld, startRound, takeEvents, update } from '../src/game/world.ts';
 import { spawnEnemy, updateEnemies, warlockStopZ } from '../src/game/enemies.ts';
-import { TEXT, castShield, castSpell, castSpellOn, pickTarget } from '../src/game/spells.ts';
+import { TEXT, castShield, castSpell, castSpellOn, counterShape, pickTarget } from '../src/game/spells.ts';
 import { pushApart } from '../src/game/crowd.ts';
 import { formatRoundLog, noteStrokeStart } from '../src/game/roundLog.ts';
 
@@ -109,6 +109,10 @@ function runEnemies(world: World, seconds: number): void {
   check('nature > water', effectiveness('nature', 'water') === 2);
   check('same element = 0.5', effectiveness('fire', 'fire') === 0.5);
   check('losing element = 1', effectiveness('fire', 'water') === 1);
+  // Hints: the shape that beats each element.
+  check('fire enemy -> circle', counterShape('fire') === 'circle');
+  check('nature enemy -> triangle', counterShape('nature') === 'triangle');
+  check('water enemy -> v', counterShape('water') === 'v');
 }
 
 // ---- Floating texts: in the result AND as world events ----

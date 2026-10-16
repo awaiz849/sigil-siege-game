@@ -1,7 +1,7 @@
 // Spells: targeting, damage rules, combo, MISS / FIZZLE, lightning cooldown and the shield.
 // Every cast returns a SpellResult and adds floating-text events, so UI and sound can react. No drawing here.
 import { CONFIG } from '../config.ts';
-import { effectiveness } from './types.ts';
+import { BEATS, effectiveness } from './types.ts';
 import type { Element, Enemy, FloatText, SpellName, Vec3, World } from './types.ts';
 import { removeEnemy } from './enemies.ts';
 import { logCast } from './roundLog.ts';
@@ -14,6 +14,12 @@ export const SIGIL_SPELLS: Record<string, SpellName> = {
   zigzag: 'lightning',
   line: 'shield',
 };
+
+/** The shape to draw against an enemy of this element (the spell that beats it). Used for hints. */
+export function counterShape(element: Element): string {
+  const spell = (Object.keys(BEATS) as Element[]).find((s) => BEATS[s] === element)!;
+  return Object.keys(SIGIL_SPELLS).find((shape) => SIGIL_SPELLS[shape] === spell)!;
+}
 
 /** Words shown as floating text. */
 export const TEXT = {
