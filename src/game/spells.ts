@@ -60,6 +60,29 @@ function fail(world: World, kind: 'miss' | 'fizzle', spell: SpellName | null): S
 }
 
 /**
+ * Target = the living enemy whose SCREEN position is nearest the stroke centre.
+ * project(enemy) comes from the renderer (null = off screen), so this file never needs three.js.
+ */
+export function pickTarget(
+  world: World,
+  centre: { x: number; y: number },
+  project: (enemy: Enemy) => { x: number; y: number } | null,
+): number | null {
+  let best: number | null = null;
+  let bestDist = Infinity;
+  for (const enemy of world.enemies) {
+    const p = project(enemy);
+    if (!p) continue;
+    const d = Math.hypot(p.x - centre.x, p.y - centre.y);
+    if (d < bestDist) {
+      bestDist = d;
+      best = enemy.id;
+    }
+  }
+  return best;
+}
+
+/**
  * Cast the spell for a recognized sigil.
  * @param sigilName recognizer name (line | v | zigzag | circle | triangle), or null if not recognized
  * @param targetId  enemy nearest the stroke centre on screen, or null if none

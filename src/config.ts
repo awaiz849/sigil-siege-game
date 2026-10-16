@@ -74,7 +74,7 @@ export const CONFIG = {
 
   // ---- Game logic: field, spawning, crowd (src/game) ----
   /** Longest frame step the logic accepts (s); a bigger gap (tab switch) is clamped. */
-  MAX_DT: 0.1,
+  MAX_DT: 0.05,
   /** Field in three.js world units: enemies spawn at spawnZ and walk +z toward wallZ.
    *  lanes = spawn x positions, halfWidth = how far sideways enemies may be pushed,
    *  laneClearDist = a lane is free when nobody is this close to its spawn point. */

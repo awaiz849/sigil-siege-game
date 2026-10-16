@@ -30,18 +30,18 @@ export function pushApart(world: World): void {
       let dx = b.pos.x - a.pos.x;
       const dz = b.pos.z - a.pos.z;
       const minDist = a.radius + b.radius;
-      if (Math.hypot(dx, dz) >= minDist) continue;
+      const overlap = minDist - Math.hypot(dx, dz);
+      if (overlap <= 0) continue;
 
       const pushA = canBePushed(a);
       const pushB = canBePushed(b);
       if (!pushA && !pushB) continue;
 
-      // Lined up exactly behind each other: add a small sideways nudge so they slide around.
+      // Lined up exactly behind each other: tilt the push sideways so they slide around.
       if (Math.abs(dx) < CONFIG.PUSH_NUDGE) dx = b.id % 2 === 0 ? CONFIG.PUSH_NUDGE : -CONFIG.PUSH_NUDGE;
-      const dist = Math.hypot(dx, dz);
-      const overlap = minDist - dist;
-      const nx = dx / dist;
-      const nz = dz / dist;
+      const len = Math.hypot(dx, dz);
+      const nx = dx / len;
+      const nz = dz / len;
 
       // Share the push, or give it all to the one that can move.
       const shareA = pushA ? (pushB ? 0.5 : 1) : 0;
