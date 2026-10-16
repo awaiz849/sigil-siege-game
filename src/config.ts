@@ -96,7 +96,7 @@ export const CONFIG = {
   /** After the boss arrives imps come every this many seconds. */
   AFTER_BOSS_IMP_S: 5,
   /** Delay before the first spawn of a newly enabled enemy type in a wave. */
-  FIRST_SPAWN_DELAY_S: 1,
+  FIRST_SPAWN_DELAY_S: 0,
   /** All spawns pause this long when the boss arrives. */
   BOSS_SPAWN_PAUSE_S: 6,
   /** Two spawns never happen closer together than this (no bursts). */

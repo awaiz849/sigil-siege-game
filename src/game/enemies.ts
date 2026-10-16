@@ -3,6 +3,7 @@
 import { CONFIG } from '../config.ts';
 import type { Element, Enemy, EnemyType, World } from './types.ts';
 import { ELEMENTS, damageCastle, pick } from './world.ts';
+import { scaledSpeed } from './difficulty.ts';
 
 /** Base stats (Normal difficulty) per enemy type. */
 const STATS: Record<EnemyType, { hp: number; speed: number }> = {
@@ -22,7 +23,7 @@ export function spawnEnemy(world: World, type: EnemyType, element: Element, x: n
     hp: stats.hp,
     maxHp: stats.hp,
     pos: { x, y: type === 'bird' ? CONFIG.BIRD_FLIGHT.flyY : 0, z: CONFIG.FIELD.spawnZ },
-    speed: stats.speed * CONFIG.DIFFICULTY[world.difficulty].speed,
+    speed: scaledSpeed(world, stats.speed),
     radius: CONFIG.ENEMY_RADIUS[type],
     state: 'walk',
     stateT: 0,
