@@ -1,4 +1,5 @@
-// Colours for the 3D world. Sunset mood: orange horizon, magenta-to-indigo sky, purple mountains.
+// Colours for the 3D world. Sunset mood (wave 1): orange horizon, magenta-to-indigo sky, purple mountains.
+// Waves 2 and 3 change the scenery: their colours sit next to each themed part ([valley, frost, inferno]).
 import type { Element } from '../game/types.ts';
 
 export const PALETTE = {
@@ -11,13 +12,8 @@ export const PALETTE = {
   fog: 0xcaa6bc, // lilac haze (matches the mountains' misty feet)
   sun: 0xfff2c4,
   sunHalo: 'rgba(255,205,130,0.75)',
-  // Night (wave 3): deep navy sky, a faint purple glow where the sun went down, the moon.
-  nightTop: 0x03020a,
-  nightMid: 0x0b0a22,
-  nightHorizon: 0x1c1840,
-  nightGlow: 0x3a1638,
-  nightFog: 0x0e0c22,
-  moon: 0xfff1cf,
+  // The blood moon over the volcanic wasteland (wave 3 scenery).
+  bloodMoon: 0xff9a6a,
   grass: 0x6a9a4a,
   grassDark: 0x3f6e38,
   road: 0x9f8a6c,

@@ -231,12 +231,25 @@ export const CONFIG = {
   AUTO_QUALITY: { enabled: true, minFps: 45, seconds: 2.5 },
   /** Soft mist sprites over the field (big transparent sprites cost fill rate). */
   MIST_SPRITES: 8,
-  /** Sunset look: sky fill light, warm key light from behind the castle, orange sun rim light
-   *  from behind the monsters (the sun), fog density. Raise ambient/key if the screen is too dark. */
-  SUNSET: { ambient: 1.3, key: 2.0, rim: 2.2, fog: 0.0052 },
-  /** Night falls in wave 3: from startS the scene fades from sunset to night over `seconds`
-   *  (sun sinks, moon and stars come out). The night light values: sky fill, moonlight, cold rim, fog. */
-  NIGHTFALL: { startS: 60, seconds: 12, ambient: 1.1, key: 2.2, rim: 1.3, fog: 0.011 },
+  /** Scenery per wave (render only; colours in render/themes.ts). byWave = theme for waves 1, 2, 3:
+   *    valley   wave 1: the sunset valley from the concept art
+   *    frost    wave 2: a snowy mountain pass in cold daylight, frozen river, falling snow
+   *    inferno  wave 3: a volcanic wasteland at night, lava river, blood moon, rising embers
+   *  When a wave starts the scene fades to its theme over fadeS seconds; a new round (or the menu)
+   *  fades back to the valley. light = per theme: sky fill, key light (from behind the castle),
+   *  rim light (behind the monsters), fog density. Raise ambient/key if the screen is too dark.
+   *  snow / embers = weather particle counts (only drawn while their theme shows). */
+  WAVE_SCENERY: {
+    byWave: ['valley', 'frost', 'inferno'] as const,
+    fadeS: 4,
+    light: {
+      valley: { ambient: 1.3, key: 2.0, rim: 2.2, fog: 0.0052 },
+      frost: { ambient: 0.95, key: 1.35, rim: 1.4, fog: 0.0055 },
+      inferno: { ambient: 1.2, key: 1.6, rim: 2.6, fog: 0.011 },
+    },
+    snow: 700,
+    embers: 260,
+  },
   /** The sunset valley around the field (render only, world units; the field runs from z -4 to -42).
    *  sun = where the sun sits, far behind the mountains (the sky glow and the orange rim light follow it).
    *  river = points (x, z) the river flows through, from the waterfalls by the castle to the right edge.

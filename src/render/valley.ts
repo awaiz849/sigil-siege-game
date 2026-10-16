@@ -5,12 +5,16 @@
 //   siege towers   the enemy's wooden towers along the field, red banners, a fire on top
 //   fences         wooden fences along the road
 // Positions live in CONFIG.SCENERY; everything stands on the shared terrain (terrain.ts).
+// setTheme() follows the wave's scenery (themes.ts): in wave 2 (frost) the river and waterfalls
+// freeze and snow covers the stone and wood; in wave 3 (inferno) they turn to flowing lava and
+// everything is charred black.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONFIG } from '../config.ts';
 import { toon } from './toon.ts';
 import { brickTexture, radialTexture } from './environment.ts';
 import { groundHeight, riverPoints, waterHeight } from './terrain.ts';
+import { mixNum, themedColor, themedTint, type Themed, type ThemeWeights } from './themes.ts';
 
 let seed = 777;
 function rand(): number {
@@ -19,19 +23,19 @@ function rand(): number {
 }
 const range = (a: number, b: number) => a + rand() * (b - a);
 
-type Piece = { object: THREE.Object3D; update?: (t: number) => void };
+/** themed = colours that follow the wave's scenery. */
+type Piece = { object: THREE.Object3D; update?: (t: number) => void; themed?: Themed[] };
 
 export function createValley(scene: THREE.Scene) {
-  const river = createRiver();
-  const pieces: Piece[] = [river, createBridge(), createCliffCastle(), createSiegeTowers(), createFences()];
+  const pieces: Piece[] = [createRiver(), createBridge(), createCliffCastle(), createSiegeTowers(), createFences()];
   for (const p of pieces) scene.add(p.object);
+  const themed = pieces.flatMap((p) => p.themed ?? []);
   return {
     update(t: number) {
       for (const p of pieces) p.update?.(t);
     },
-    /** 0 = sunset, 1 = night: the river turns dark blue. */
-    setNight(n: number) {
-      river.water.color.set(0xb9bff0).lerp(new THREE.Color(0x2a3060), n);
+    setTheme(w: ThemeWeights) {
+      for (const f of themed) f(w);
     },
   };
 }
@@ -56,7 +60,7 @@ function waterTexture(): THREE.CanvasTexture {
   return tex;
 }
 
-function createRiver(): Piece & { water: THREE.MeshBasicMaterial } {
+function createRiver(): Piece {
   const pts = riverPoints();
   const w = CONFIG.SCENERY.riverWidth;
   const pos: number[] = [];
@@ -103,13 +107,26 @@ function createRiver(): Piece & { water: THREE.MeshBasicMaterial } {
     group.add(s);
     return s;
   });
+  // Per theme [valley, frost, inferno]: lavender water / white-blue ice (still) / slow glowing lava.
+  const flowSpeeds = [0.25, 0, 0.08] as const;
+  let flow = 0.25;
+  let glintAmount = 1;
+  let lastT = 0;
   return {
     object: group,
-    water: water.material as THREE.MeshBasicMaterial,
     update(t) {
-      map.offset.y = -t * 0.25; // flows downstream
-      glints.forEach((g, k) => ((g.material as THREE.SpriteMaterial).opacity = 0.35 + 0.35 * Math.sin(t * 2.5 + k * 1.9)));
+      map.offset.y -= (t - lastT) * flow; // flows downstream
+      lastT = t;
+      glints.forEach((g, k) => ((g.material as THREE.SpriteMaterial).opacity = (0.35 + 0.35 * Math.sin(t * 2.5 + k * 1.9)) * glintAmount));
     },
+    themed: [
+      themedColor((water.material as THREE.MeshBasicMaterial).color, [0xb9bff0, 0xdcefff, 0xff5a14]),
+      ...glints.map((g) => themedColor(g.material.color, [0xffffff, 0xffffff, 0xffc060])),
+      (w) => {
+        flow = mixNum(flowSpeeds, w);
+        glintAmount = mixNum([1, 1, 0.6], w);
+      },
+    ],
   };
 }
 
@@ -159,7 +176,7 @@ function createBridge(): Piece {
     g.add(p);
   }
   g.position.z = CONFIG.SCENERY.bridgeZ;
-  return { object: g };
+  return { object: g, themed: [themedTint(stone.color, 0.5, 0.7)] };
 }
 
 // ---------------------------------------------------------------- cliff castle + waterfalls
@@ -241,6 +258,7 @@ function createCliffCastle(): Piece {
   const fallTex = new THREE.CanvasTexture(cv);
   fallTex.wrapS = fallTex.wrapT = THREE.RepeatWrapping;
   const fallMat = new THREE.MeshBasicMaterial({ map: fallTex, color: 0xf2eaff, transparent: true, opacity: 0.85, depthWrite: false, fog: false, side: THREE.DoubleSide });
+  const mists: THREE.SpriteMaterial[] = [];
   const mistTex = radialTexture('rgba(255,250,255,0.9)', 'rgba(255,250,255,0)');
   const [riverX, riverZ] = CONFIG.SCENERY.river[0];
   const foot = waterHeight(riverX, riverZ);
@@ -254,12 +272,25 @@ function createCliffCastle(): Piece {
     mist.position.set(fx, foot + 1.5, 10);
     mist.scale.set(w * 4, 4, 1);
     g.add(mist);
+    mists.push(mist.material);
   }
+  // Per theme [valley, frost, inferno]: waterfalls / frozen falls (barely moving) / lava falls.
+  let fallSpeed = 0.6;
+  let lastT = 0;
   return {
     object: g,
     update(t) {
-      fallTex.offset.y = t * 0.6;
+      fallTex.offset.y += (t - lastT) * fallSpeed;
+      lastT = t;
     },
+    themed: [
+      themedTint(rockMat.color, 0.6, 0.75),
+      themedTint(stoneMat.color, 0.35, 0.7),
+      themedTint(roofMat.color, 0.75, 0.5),
+      themedColor(fallMat.color, [0xf2eaff, 0xcfe6ff, 0xff6a1a]),
+      ...mists.map((m) => themedColor(m.color, [0xffffff, 0xffffff, 0xff7a3a])),
+      (w) => (fallSpeed = mixNum([0.6, 0.03, 0.3], w)),
+    ],
   };
 }
 
@@ -388,6 +419,7 @@ function createSiegeTowers(): Piece {
 
   return {
     object: group,
+    themed: [themedTint(wood.color, 0.35, 0.6), themedTint(roofMat.color, 0.75, 0.5)],
     update(t) {
       for (const b of banners) {
         for (let k = 0; k < b.pos.count; k++) {
@@ -449,5 +481,5 @@ function createFences(): Piece {
   rails.count = r;
   const g = new THREE.Group();
   g.add(posts, rails);
-  return { object: g };
+  return { object: g, themed: [themedTint(wood.color, 0.45, 0.6)] };
 }

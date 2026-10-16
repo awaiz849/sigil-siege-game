@@ -18,6 +18,7 @@ import { createCastleFire } from './castleFire.ts';
 import { createEnding } from './ending.ts';
 import { castleMaxHp } from '../game/difficulty.ts';
 import { InkOutlinePass } from './toon.ts';
+import { mixNum, themedColor, themeForWave, THEMES, type PerTheme, type Themed, type ThemeWeights } from './themes.ts';
 
 /** A spell orb flying from where the sigil was drawn to its target. */
 type Shot = { sprite: THREE.Sprite; from: THREE.Vector3; to: THREE.Vector3; t: number; color: number; onArrive: () => void };
@@ -30,8 +31,9 @@ export function createScene(canvas: HTMLCanvasElement) {
   renderer.toneMappingExposure = 1.1;
 
   const scene = new THREE.Scene();
+  const valleyLight = CONFIG.WAVE_SCENERY.light.valley;
   scene.background = new THREE.Color(PALETTE.skyHorizon);
-  scene.fog = new THREE.FogExp2(PALETTE.fog, CONFIG.SUNSET.fog);
+  scene.fog = new THREE.FogExp2(PALETTE.fog, valleyLight.fog);
 
   // Third-person camera: behind and above the wizard on the wall, looking down the field.
   const camera = new THREE.PerspectiveCamera(CONFIG.CAMERA.fov, 1, 0.1, 1000);
@@ -43,32 +45,60 @@ export function createScene(canvas: HTMLCanvasElement) {
   // Sunset lighting: warm sky fill (peach above, dusky purple from the ground), a warm key light
   // from behind the castle (so the monsters' faces are lit), and the low sun behind the monsters
   // as an orange rim light on their silhouettes. Lightning briefly lights everything.
-  const sky = new THREE.HemisphereLight(0xffc4a0, 0x3a2346, CONFIG.SUNSET.ambient);
+  const sky = new THREE.HemisphereLight(0xffc4a0, 0x3a2346, valleyLight.ambient);
   scene.add(sky);
-  const key = new THREE.DirectionalLight(0xffd8b0, CONFIG.SUNSET.key);
+  const key = new THREE.DirectionalLight(0xffd8b0, valleyLight.key);
   key.position.set(25, 40, 40);
   key.castShadow = CONFIG.SHADOWS;
   scene.add(key);
-  const rim = new THREE.DirectionalLight(0xff8a3a, CONFIG.SUNSET.rim);
+  const rim = new THREE.DirectionalLight(0xff8a3a, valleyLight.rim);
   rim.position.set(CONFIG.SCENERY.sun.x, CONFIG.SCENERY.sun.y, CONFIG.SCENERY.sun.z);
   scene.add(rim);
 
   const environment = createEnvironment(scene);
-  // Sunset -> night (wave 3): the colours both ends fade between.
-  let night = 0;
+  // Scenery per wave (themes.ts): the lights, fog and background follow the theme too.
+  // Per theme [valley, frost, inferno]: warm sunset / cold white daylight / red glow of lava at night.
   const fog = scene.fog as THREE.FogExp2;
-  const daySky = sky.color.clone();
-  const nightSky = new THREE.Color(0x5a64b8);
-  const dayGround = sky.groundColor.clone();
-  const nightGround = new THREE.Color(0x120c1c);
-  const dayKey = key.color.clone();
-  const moonKey = new THREE.Color(0x9fb4ff);
-  const dayRim = rim.color.clone();
-  const nightRim = new THREE.Color(0x6a5cff);
-  const dayFog = fog.color.clone();
-  const nightFog = new THREE.Color(PALETTE.nightFog);
-  const dayBg = (scene.background as THREE.Color).clone();
-  const nightBg = new THREE.Color(PALETTE.nightHorizon);
+  const lights = (['ambient', 'key', 'rim', 'fog'] as const).map((k) =>
+    THEMES.map((t) => CONFIG.WAVE_SCENERY.light[t][k]),
+  ) as unknown as [PerTheme<number>, PerTheme<number>, PerTheme<number>, PerTheme<number>];
+  const themedLights: Themed[] = [
+    themedColor(sky.color, [0xffc4a0, 0xdcecff, 0xe8a090]),
+    themedColor(sky.groundColor, [0x3a2346, 0x56668a, 0x2a0c0a]),
+    themedColor(key.color, [0xffd8b0, 0xf2f6ff, 0xffdcc8]),
+    themedColor(rim.color, [0xff8a3a, 0xa8d4ff, 0xff3a10]),
+    themedColor(fog.color, [PALETTE.fog, 0xb2c2d8, 0x2e0e0a]),
+    themedColor(scene.background as THREE.Color, [PALETTE.skyHorizon, 0xc2d6ee, 0x5a160c]),
+  ];
+  let ambient = valleyLight.ambient;
+  // Theme fade: weights slide from `fadeFrom` to the target theme over CONFIG.WAVE_SCENERY.fadeS.
+  let weights: ThemeWeights = [1, 0, 0];
+  let fadeFrom: ThemeWeights = weights;
+  let themeTarget = 0;
+  let fade = 1;
+  function applyTheme(w: ThemeWeights) {
+    environment.setTheme(w);
+    for (const f of themedLights) f(w);
+    ambient = mixNum(lights[0], w);
+    key.intensity = mixNum(lights[1], w);
+    rim.intensity = mixNum(lights[2], w);
+    fog.density = mixNum(lights[3], w);
+  }
+  applyTheme(weights);
+  /** Follow the wave: wave 1 (and the menus) = valley, then CONFIG.WAVE_SCENERY.byWave. */
+  function updateTheme(world: World, dt: number) {
+    const want = world.phase === 'MENU' ? 0 : themeForWave(world.wave);
+    if (want !== themeTarget) {
+      themeTarget = want;
+      fadeFrom = weights;
+      fade = 0;
+    }
+    if (fade >= 1) return;
+    fade = Math.min(1, fade + dt / CONFIG.WAVE_SCENERY.fadeS);
+    const k = THREE.MathUtils.smootherstep(fade, 0, 1);
+    weights = fadeFrom.map((f, i) => THREE.MathUtils.lerp(f, i === themeTarget ? 1 : 0, k)) as unknown as ThemeWeights;
+    applyTheme(weights);
+  }
   // The castle burns as it loses HP.
   const castleFire = createCastleFire(scene);
   const wizard = createWizard();
@@ -229,20 +259,8 @@ export function createScene(canvas: HTMLCanvasElement) {
   function render(world: World, dt: number) {
     time += dt;
     environment.update(time, dt);
-    // Night falls in wave 3 (eases back to sunset when a new round starts).
-    const nf = CONFIG.NIGHTFALL;
-    const wantNight = world.phase === 'MENU' ? 0 : THREE.MathUtils.smoothstep(world.time, nf.startS, nf.startS + nf.seconds);
-    night += (wantNight - night) * Math.min(1, dt * 2);
-    environment.setNight(night);
-    sky.color.copy(daySky).lerp(nightSky, night);
-    sky.groundColor.copy(dayGround).lerp(nightGround, night);
-    key.color.copy(dayKey).lerp(moonKey, night);
-    key.intensity = THREE.MathUtils.lerp(CONFIG.SUNSET.key, nf.key, night);
-    rim.color.copy(dayRim).lerp(nightRim, night);
-    rim.intensity = THREE.MathUtils.lerp(CONFIG.SUNSET.rim, nf.rim, night);
-    fog.color.copy(dayFog).lerp(nightFog, night);
-    fog.density = THREE.MathUtils.lerp(CONFIG.SUNSET.fog, nf.fog, night);
-    (scene.background as THREE.Color).copy(dayBg).lerp(nightBg, night);
+    // The scenery changes with the wave (fades back to the valley for a new round).
+    updateTheme(world, dt);
     castleFire.update(world.castleHp / castleMaxHp(world), time, dt);
     wizard.update(time, dt);
     // A trickle of golden sparks from the wizard's orb.
@@ -253,7 +271,7 @@ export function createScene(canvas: HTMLCanvasElement) {
     }
     // Lightning flash: the whole scene lights up for a moment.
     lightningT = Math.max(0, lightningT - dt * 4);
-    sky.intensity = THREE.MathUtils.lerp(CONFIG.SUNSET.ambient, CONFIG.NIGHTFALL.ambient, night) + lightningT * 6;
+    sky.intensity = ambient + lightningT * 6;
     enemies.update(world, time, dt);
     updateShots(dt);
     updateWaves(dt);

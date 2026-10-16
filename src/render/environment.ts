@@ -2,6 +2,9 @@
 // torches, mist and drifting embers. The sunset sky and mountains are in sky.ts, the river, bridge,
 // far castle, siege towers and fences in valley.ts, the ground shape in terrain.ts.
 // Everything is built from three.js primitives (no downloaded assets).
+// setTheme() follows the wave's scenery (themes.ts): wave 1 the green sunset valley, wave 2 snow
+// (white hills, snow-capped pines, falling snow), wave 3 ash and lava (black hills, charred pines,
+// rising embers). Fireflies only fly in the valley.
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { toon } from './toon.ts';
@@ -11,6 +14,7 @@ import { createLandmarks } from './landmarks.ts';
 import { createSky } from './sky.ts';
 import { createValley } from './valley.ts';
 import { groundHeight, nearestRiver, noise2, roadAmount } from './terrain.ts';
+import { mixArray, themedColor, themedTint, type PerTheme, type Themed, type ThemeWeights } from './themes.ts';
 
 /** Small seeded random so the scenery looks the same every time. */
 function makeRandom(seed: number) {
@@ -24,26 +28,43 @@ const range = (a: number, b: number) => a + rand() * (b - a);
 
 export function createEnvironment(scene: THREE.Scene) {
   const updaters: Array<(t: number, dt: number) => void> = [];
+  const themed: Themed[] = [];
 
   const sky = createSky(scene);
   updaters.push(sky.update);
-  scene.add(createGround());
+  themed.push(sky.setTheme);
+  const ground = createGround();
+  scene.add(ground.mesh);
+  themed.push(ground.setTheme);
   const valley = createValley(scene);
   updaters.push(valley.update);
-  scene.add(createForest());
-  scene.add(createRocks());
+  themed.push(valley.setTheme);
+  const forest = createForest();
+  scene.add(forest.group);
+  themed.push(forest.setTheme);
+  const rocks = createRocks();
+  scene.add(rocks);
+  themed.push(themedTint((rocks.material as THREE.MeshToonMaterial).color, 0.6, 0.6));
   const wall = createWall();
   scene.add(wall.group);
   updaters.push(wall.update);
   const mist = createMist();
   mist.sprites.forEach((m) => scene.add(m));
   updaters.push(mist.update);
+  // Field mist per theme [valley, frost, inferno]: pink sunset haze / white snow haze / dark smoke.
+  themed.push(...mist.sprites.map((m) => themedColor(m.material.color, [0xffffff, 0xe8f2ff, 0x6a3428])));
   const landmarks = createLandmarks(scene);
   updaters.push(landmarks.update);
   const fireflies = createFireflies();
   scene.add(fireflies.points);
   updaters.push(fireflies.update);
-
+  themed.push(fireflies.setTheme);
+  // Weather: snow falls in frost, embers rise in inferno.
+  for (const weather of [createSnow(), createEmbers()]) {
+    scene.add(weather.points);
+    updaters.push(weather.update);
+    themed.push(weather.setTheme);
+  }
 
   return {
     update(t: number, dt: number) {
@@ -51,31 +72,38 @@ export function createEnvironment(scene: THREE.Scene) {
     },
     /** The castle we stand on (the defeat cinematic knocks it down). */
     castle: { wall: wall.group, towers: landmarks.towers },
-    /** 0 = sunset, 1 = night (wave 3). */
-    setNight(n: number) {
-      sky.setNight(n);
-      valley.setNight(n);
+    /** Blend the scenery between the wave themes (themes.ts). */
+    setTheme(w: ThemeWeights) {
+      for (const f of themed) f(w);
     },
   };
 }
 
 // ---------------------------------------------------------------- ground
 
-function createGround(): THREE.Mesh {
+function createGround() {
   // One big subdivided plane: flat dirt road down the middle (where enemies walk),
   // rolling grass hills on the sides, the river bed on the right (terrain.ts).
-  // Colours vary per vertex for a hand-painted look.
+  // Colours vary per vertex for a hand-painted look; one set per theme [valley, frost, inferno]:
+  // green grass and a dirt road / snow and a trampled grey track / black ash, dark rock and lava banks.
   const geo = new THREE.PlaneGeometry(300, 230, 150, 115);
   geo.rotateX(-Math.PI / 2);
   geo.translate(0, 0, -90);
   const pos = geo.attributes.position as THREE.BufferAttribute;
-  const colors = new Float32Array(pos.count * 3);
-  const grass = new THREE.Color(PALETTE.grass);
-  const grassDark = new THREE.Color(PALETTE.grassDark);
-  const road = new THREE.Color(PALETTE.road);
-  const roadDark = new THREE.Color(PALETTE.roadDark);
+  const looks = [
+    { grass: PALETTE.grass, grassDark: PALETTE.grassDark, road: PALETTE.road, roadDark: PALETTE.roadDark, bank: 0x6b6a4a },
+    { grass: 0xe8f0fa, grassDark: 0xa6b8d4, road: 0x958e98, roadDark: 0x6a6472, bank: 0x9cc0e0 },
+    { grass: 0x4a3a36, grassDark: 0x1c1414, road: 0x5c463a, roadDark: 0x3a2a24, bank: 0xc8401a },
+  ].map((l) => ({
+    grass: new THREE.Color(l.grass),
+    grassDark: new THREE.Color(l.grassDark),
+    road: new THREE.Color(l.road),
+    roadDark: new THREE.Color(l.roadDark),
+    bank: new THREE.Color(l.bank), // river banks: mud / ice / glowing lava edge
+  }));
+  const perTheme = looks.map(() => new Float32Array(pos.count * 3)) as unknown as PerTheme<Float32Array>;
   const c = new THREE.Color();
-  const bank = new THREE.Color(0x6b6a4a); // muddy river banks
+  const r = new THREE.Color();
   const w = CONFIG.SCENERY.riverWidth;
 
   for (let i = 0; i < pos.count; i++) {
@@ -83,26 +111,39 @@ function createGround(): THREE.Mesh {
     const z = pos.getZ(i);
     pos.setY(i, groundHeight(x, z));
     const n = noise2(x, z);
-    c.copy(grassDark).lerp(grass, 0.5 + n * 0.5);
-    const r = c.clone().copy(roadDark).lerp(road, 0.5 + noise2(x * 3, z * 3) * 0.5);
-    c.lerp(r, roadAmount(x, z));
-    c.lerp(bank, 1 - THREE.MathUtils.smoothstep(nearestRiver(x, z).dist, w * 0.6, w * 1.6));
+    const roadMix = 0.5 + noise2(x * 3, z * 3) * 0.5;
+    const onRoad = roadAmount(x, z);
+    const onBank = 1 - THREE.MathUtils.smoothstep(nearestRiver(x, z).dist, w * 0.6, w * 1.6);
     // A little random speckle.
     const s = 0.92 + rand() * 0.12;
-    colors.set([c.r * s, c.g * s, c.b * s], i * 3);
+    looks.forEach((l, t) => {
+      c.copy(l.grassDark).lerp(l.grass, 0.5 + n * 0.5);
+      r.copy(l.roadDark).lerp(l.road, roadMix);
+      c.lerp(r, onRoad);
+      c.lerp(l.bank, onBank);
+      perTheme[t].set([c.r * s, c.g * s, c.b * s], i * 3);
+    });
   }
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  const colors = new THREE.BufferAttribute(perTheme[0].slice(), 3);
+  geo.setAttribute('color', colors);
   geo.computeVertexNormals();
   const mesh = new THREE.Mesh(
     geo,
     toon({ vertexColors: true, roughness: 1, flatShading: true }),
   );
   mesh.receiveShadow = CONFIG.SHADOWS;
-  return mesh;
+  return {
+    mesh,
+    setTheme(wt: ThemeWeights) {
+      mixArray(colors.array as Float32Array, perTheme, wt);
+      colors.needsUpdate = true;
+    },
+  };
 }
 
-function createForest(): THREE.Group {
+function createForest() {
   // Low-poly pines on both sides of the road, instanced (one draw call per part).
+  // Crowns per theme [valley, frost, inferno]: green pines / snow-capped pines / charred black.
   const g = new THREE.Group();
   const count = 380;
   const trunkGeo = new THREE.CylinderGeometry(0.15, 0.22, 1.2, 5);
@@ -114,6 +155,7 @@ function createForest(): THREE.Group {
   const q = new THREE.Quaternion();
   const col = new THREE.Color();
   const minX = CONFIG.FIELD.halfWidth + 4;
+  const shades: number[] = []; // per tree: 0 = light green, 1 = dark
 
   const clear = (x: number, z: number) =>
     nearestRiver(x, z).dist > CONFIG.SCENERY.riverWidth * 1.4 + 1.2 &&
@@ -134,14 +176,49 @@ function createForest(): THREE.Group {
     crownA.setMatrixAt(placed, m);
     m.compose(new THREE.Vector3(x, y + 3.6 * s, z), q, new THREE.Vector3(s * 0.75, s * 0.8, s * 0.75));
     crownB.setMatrixAt(placed, m);
-    col.set(PALETTE.pine).lerp(new THREE.Color(PALETTE.pineDark), rand());
+    const shade = rand();
+    shades.push(shade);
+    col.set(PALETTE.pine).lerp(new THREE.Color(PALETTE.pineDark), shade);
     crownA.setColorAt(placed, col);
     crownB.setColorAt(placed, col.multiplyScalar(1.15));
     placed++;
   }
   trunk.count = crownA.count = crownB.count = placed;
   g.add(trunk, crownA, crownB);
-  return g;
+
+  // Crown colours per theme, from a light tree to a dark one: lower crown (a), top crown (b).
+  // The valley's top crown is 15% brighter, as above.
+  const looks = [
+    { a: [PALETTE.pine, PALETTE.pineDark], b: [PALETTE.pine, PALETTE.pineDark], bBoost: 1.15 },
+    { a: [0x4e7a74, 0x2c5054], b: [0xf4f8ff, 0xc6d6ea], bBoost: 1 }, // dark green under snow caps
+    { a: [0x2a1a16, 0x120a0a], b: [0x3a1a12, 0x5a1c0e], bBoost: 1 }, // charcoal, smouldering tips
+  ];
+  const build = (part: 'a' | 'b') =>
+    looks.map((l) => {
+      const arr = new Float32Array(count * 3);
+      const light = new THREE.Color(l[part][0]);
+      const dark = new THREE.Color(l[part][1]);
+      const boost = part === 'b' ? l.bBoost : 1;
+      shades.forEach((sh, i) => {
+        col.copy(light).lerp(dark, sh).multiplyScalar(boost);
+        arr.set([col.r, col.g, col.b], i * 3);
+      });
+      return arr;
+    }) as unknown as PerTheme<Float32Array>;
+  const perA = build('a');
+  const perB = build('b');
+  const colorsA = crownA.instanceColor!;
+  const colorsB = crownB.instanceColor!;
+  const trunkTint = themedTint((trunk.material as THREE.MeshToonMaterial).color, 0.2, 0.7);
+  return {
+    group: g,
+    setTheme(w: ThemeWeights) {
+      mixArray(colorsA.array as Float32Array, perA, w);
+      mixArray(colorsB.array as Float32Array, perB, w);
+      colorsA.needsUpdate = colorsB.needsUpdate = true;
+      trunkTint(w);
+    },
+  };
 }
 
 function createRocks(): THREE.InstancedMesh {
@@ -394,9 +471,11 @@ function createFireflies() {
     depthWrite: false,
   });
   const points = new THREE.Points(geo, mat);
+  let shown = 1;
   return {
     points,
     update(t: number) {
+      if (!points.visible) return;
       for (let i = 0; i < count; i++) {
         const k = i * 3;
         pos[k] = base[k] + Math.sin(t * 0.3 + i) * 1.2;
@@ -404,9 +483,79 @@ function createFireflies() {
         pos[k + 2] = base[k + 2] + Math.cos(t * 0.25 + i * 0.9) * 1.2;
       }
       geo.attributes.position.needsUpdate = true;
-      mat.opacity = 0.7 + Math.sin(t * 2) * 0.2;
+      mat.opacity = (0.7 + Math.sin(t * 2) * 0.2) * shown;
+    },
+    /** Fireflies only fly in the valley theme. */
+    setTheme(w: ThemeWeights) {
+      shown = w[0];
+      points.visible = shown > 0.01;
     },
   };
+}
+
+// ---------------------------------------------------------------- weather: snow + embers
+
+/** The weather has its own seeded random, so the rest of the scenery is laid out as before. */
+const weatherRand = makeRandom(31);
+const wr = (a: number, b: number) => a + weatherRand() * (b - a);
+
+/** Particles drifting over the field: dir = -1 falls (snow), +1 rises (embers), wrapping around.
+ *  Shown only while theme number `theme` (THEMES order) is in the weights; skipped otherwise. */
+function createWeather(count: number, theme: number, dir: number, speed: [number, number], height: number, mat: THREE.PointsMaterial) {
+  const base = new Float32Array(count * 4); // x, y, z, speed
+  for (let i = 0; i < count; i++) base.set([wr(-32, 32), wr(0, height), wr(-70, -6), wr(speed[0], speed[1])], i * 4);
+  const pos = new Float32Array(count * 3);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const points = new THREE.Points(geo, mat);
+  points.visible = false;
+  points.frustumCulled = false; // positions change every frame
+  const opacity = mat.opacity;
+  let shown = 0;
+  return {
+    points,
+    update(t: number) {
+      if (!points.visible) return;
+      for (let i = 0; i < count; i++) {
+        const b = i * 4;
+        pos[i * 3] = base[b] + Math.sin(t * 0.8 + i) * 0.7; // sway sideways
+        pos[i * 3 + 1] = (((base[b + 1] + dir * t * base[b + 3]) % height) + height) % height;
+        pos[i * 3 + 2] = base[b + 2] + Math.cos(t * 0.6 + i * 1.3) * 0.4;
+      }
+      geo.attributes.position.needsUpdate = true;
+      // Embers flicker; snow stays steady.
+      mat.opacity = opacity * shown * (dir > 0 ? 0.75 + Math.sin(t * 7) * 0.25 : 1);
+    },
+    setTheme(w: ThemeWeights) {
+      shown = w[theme];
+      points.visible = shown > 0.01;
+    },
+  };
+}
+
+function createSnow() {
+  const mat = new THREE.PointsMaterial({
+    map: radialTexture('rgba(255,255,255,1)', 'rgba(255,255,255,0)'),
+    color: 0xffffff,
+    size: 0.16,
+    transparent: true,
+    opacity: 0.95,
+    depthWrite: false,
+  });
+  return createWeather(CONFIG.WAVE_SCENERY.snow, 1, -1, [1.2, 2.4], 20, mat);
+}
+
+function createEmbers() {
+  const mat = new THREE.PointsMaterial({
+    map: radialTexture('rgba(255,220,140,1)', 'rgba(255,80,20,0)'),
+    color: 0xff8a3a,
+    size: 0.28,
+    transparent: true,
+    opacity: 1,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  return createWeather(CONFIG.WAVE_SCENERY.embers, 2, 1, [0.8, 2.2], 14, mat);
 }
 
 // ---------------------------------------------------------------- helpers
