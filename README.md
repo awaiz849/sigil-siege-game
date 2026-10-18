@@ -66,7 +66,7 @@ webcam -> MediaPipe HandLandmarker -> One Euro filter -> finger poses -> stroke
    then our own port of the $1 Unistroke Recognizer against templates generated from math.
    If nothing is confident it retries against all templates; below a score of 0.8 the spell fizzles.
 5. **Game logic** (`src/game/`) is pure TypeScript with no drawing, so every rule is tested in Node.
-6. **Rendering**: three.js scene built only from primitives (no downloaded models), with bloom.
+6. **Rendering**: three.js scene with bloom; the monsters and heroes are AI-generated 3D models (see below), the rest is built from primitives.
    A 2D canvas on top draws the HUD, enemy badges, trail, texts and menus.
 7. **Sound**: every effect is synthesized live with the Web Audio API (no audio files).
 
@@ -81,7 +81,9 @@ webcam -> MediaPipe HandLandmarker -> One Euro filter -> finger poses -> stroke
 | `src/config.ts` | every tunable number in one place |
 | `tests/` | Node test scripts |
 
-## Credits and disclosures
+## Third-party resources & AI use
+
+The MIT licence in `LICENSE` covers the team's own source code. The third-party files below keep their own licences.
 
 - **MediaPipe Hand Landmarker** by Google, Apache License 2.0 (`@mediapipe/tasks-vision` and the `hand_landmarker.task` model).
 - **three.js**, MIT License.
@@ -97,9 +99,19 @@ webcam -> MediaPipe HandLandmarker -> One Euro filter -> finger poses -> stroke
   `boss.glb` = "Ironclad Lancer", `wizard.glb` = "Lightning Sorcerer", `warden.glb` = "Arcane Scholar" (the level 2 Grand Warden). We converted the FBX exports to GLB
   ourselves (three.js FBXLoader + meshoptimizer simplifier, ~14k triangles, 1024 px base-colour texture).
   Used under Meshy's terms for generated assets.
-- **AI assistance**: Claude and Claude Code were used for planning and coding help.
+- **AI use**: built with help from **Claude** (Anthropic). Claude and Claude Code were used for planning,
+  coding help and tests. The 3D models were AI-generated with Meshy AI (above).
 
-Team Velocity:
-- Vasi: input, recognition, 3D world, UI, sound
-- Awaiz: gameplay logic
-- Farhan: demo and presentation
+## Team
+
+**Team Velocity**
+
+| Name | Role |
+|---|---|
+| Mohammad Awaiz | Gameplay logic: world, enemies, spells, waves, difficulty, scoring, game-rule tests |
+| Vasi Azam | Hand input and gesture recognition, 3D world, UI and sound |
+| Farhan | Demo and presentation |
+
+## License
+
+MIT, see [LICENSE](LICENSE). Copyright (c) 2026 Team Velocity — Mohammad Awaiz, Vasi Azam, Farhan.
