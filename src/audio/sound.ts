@@ -31,6 +31,13 @@ function audio(): AudioContext | null {
   return ctx;
 }
 
+/** Hidden tab: silence everything at once. Suspending the AudioContext also stops its clock,
+ *  so the music picks up in step when the tab comes back. */
+export function setAudioPaused(paused: boolean): void {
+  if (!ctx) return;
+  (paused ? ctx.suspend() : ctx.resume()).catch(() => {});
+}
+
 // Unlock audio on the first gesture if the autoplay flag isn't set.
 for (const ev of ['pointerdown', 'keydown']) window.addEventListener(ev, () => audio(), { once: true });
 

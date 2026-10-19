@@ -9,7 +9,7 @@ import { createDebugOverlay } from './ui/debugOverlay.ts';
 import { createCameraCorner } from './ui/cameraCorner.ts';
 import { loadFonts } from './ui/fonts.ts';
 import { createScreens, type CameraState } from './ui/screens.ts';
-import { playCast, playEvents, sound } from './audio/sound.ts';
+import { playCast, playEvents, setAudioPaused, sound } from './audio/sound.ts';
 import { setMusicIntensity, updateMusic } from './audio/music.ts';
 import { callout } from './audio/voice.ts';
 import { createMouseInput } from './input/mouseInput.ts';
@@ -117,7 +117,7 @@ function newRound(difficulty: Difficulty, hero: Hero = world.hero) {
 
 // Dev only (npm run dev): window.sigil.world() in the browser console gives the live World,
 // e.g. sigil.world().castleHp = 30 to see the castle burn, or .time = 58 to jump to wave 3.
-if (import.meta.env.DEV) Object.assign(window, { sigil: { world: () => world } });
+if (import.meta.env.DEV) Object.assign(window, { sigil: { world: () => world, frames: () => frameCount } });
 
 // Screens: hand check -> title -> (game) -> end. All hands-free.
 const screens = createScreens({
@@ -286,7 +286,29 @@ ${report}`;
 
 let lastNow = 0;
 let slowMoUntil = 0; // boss entrance slow motion ends at this time (ms)
+let frameCount = 0;
+let rafId = 0;
+
+// Hidden tab: stop the frame loop (and with it hand detection, which also skips hidden tabs) and
+// silence the audio; the round itself is already paused by the pause screen (screens.ts).
+// Coming back: restart the loop with a normal first frame (no time jump) and resume the audio.
+// The camera stream stays open, so there is no new permission prompt or camera restart.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    cancelAnimationFrame(rafId);
+    setAudioPaused(true);
+    console.info('Tab hidden: frame loop, hand detection and audio paused');
+  } else {
+    cancelAnimationFrame(rafId); // never two loops
+    lastNow = 0;
+    setAudioPaused(false);
+    rafId = requestAnimationFrame(frame);
+    console.info('Tab visible: resumed');
+  }
+});
+
 function frame(now: number) {
+  frameCount++;
   // Never 0: update() treats time 0 as "round just started".
   const realDt = lastNow ? Math.min(0.1, (now - lastNow) / 1000) : 1 / 60;
   const dt = now < slowMoUntil ? realDt * CONFIG.BOSS_ENTRANCE.speed : realDt;
@@ -310,6 +332,6 @@ function frame(now: number) {
   // Live camera in the corner during play (the debug overlay has its own bigger one).
   if (hand && !screens.current && !debugOverlay.isVisible()) cameraCorner.draw(overlay.ctx, hand);
   debugOverlay.draw(overlay.ctx, hand, world3d.quality);
-  requestAnimationFrame(frame);
+  rafId = requestAnimationFrame(frame);
 }
-requestAnimationFrame(frame);
+rafId = requestAnimationFrame(frame);
