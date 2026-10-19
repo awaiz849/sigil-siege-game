@@ -29,8 +29,27 @@ window.addEventListener('error', (e) => {
 window.addEventListener('unhandledrejection', (e) => crashed(e.reason));
 
 // ---- 2-4. Device and browser checks, then the game
+// Service worker (production only): cache-first for MediaPipe and the 3D models (public/sw.js).
+// On the very first visit we wait briefly until it controls the page, so even the first
+// downloads land in its cache; repeat visits then skip the network for those files.
+async function serviceWorkerReady(maxMs: number): Promise<void> {
+  if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return;
+  try {
+    await navigator.serviceWorker.register('/sw.js');
+    if (navigator.serviceWorker.controller) return;
+    await new Promise<void>((resolve) => {
+      navigator.serviceWorker.addEventListener('controllerchange', () => resolve(), { once: true });
+      setTimeout(resolve, maxMs);
+    });
+  } catch (err) {
+    console.warn('Service worker unavailable (files still load normally)', err);
+  }
+}
+
 function startGame(): void {
-  import('./main.ts').catch(crashed);
+  serviceWorkerReady(1500)
+    .then(() => import('./main.ts'))
+    .catch(crashed);
 }
 
 if (!hasWebGL()) {

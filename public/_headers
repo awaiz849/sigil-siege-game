@@ -8,6 +8,14 @@
 /models/*
   Cache-Control: public, max-age=31536000, immutable
 
+# The hand model had no Content-Type at all.
+/*.task
+  Content-Type: application/octet-stream
+
+# The service worker must always be re-checked, so a new version is picked up right away.
+/sw.js
+  Cache-Control: no-cache
+
 # WebAssembly must be served as application/wasm so the browser can stream-compile it.
 /*.wasm
   Content-Type: application/wasm

@@ -18,6 +18,7 @@ import { CAMERA_MESSAGES, cameraProblem, simulate } from './ui/compat.ts';
 import { hideNotice, reloadAction, setNoticeText, showNotice } from './ui/notice.ts';
 import { downloadHandAssets } from './input/handAssets.ts';
 import { createLoadingScreen } from './ui/loadingScreen.ts';
+import { createTrackingIndicator } from './ui/trackingIndicator.ts';
 import { onPalm, onStrokeEnd, onStrokePoint, onStrokeStart, onThrow } from './events.ts';
 import { classify } from './recognizer/index.ts';
 import { createRecorder } from './recognizer/recorder.ts';
@@ -33,14 +34,26 @@ const vignette = document.createElement('div');
 vignette.id = 'vignette';
 document.body.append(glCanvas, vignette, overlayCanvas);
 
-// Loading screen (index.html, visible from the first paint): real download progress of the MediaPipe
-// wasm, the hand model and the 3D models, all started now in parallel; it hides when all are done.
+// Loading screen (index.html, visible from the first paint): real download progress of the 3D models;
+// it hides as soon as the scene is ready, so the title shows early. MediaPipe (wasm + hand model)
+// starts downloading now too, in parallel, but only feeds the small corner indicator.
 const loading = createLoadingScreen();
-const handAssets = downloadHandAssets(loading);
-// Build + warm up the hand tracker during the loading screen (its first run compiles GPU shaders).
-loading.expect('warmup', 'hand tracking (warming up)', CONFIG.LOADING.expectedBytes.warmUp);
+const trackingStatus = createTrackingIndicator();
+const handAssets = downloadHandAssets(trackingStatus);
+// Hand tracking loads and warms up in the BACKGROUND (corner indicator); the title does not wait.
+trackingStatus.expect('warmup', 'warming up', CONFIG.LOADING.expectedBytes.warmUp);
 const handTracker = handAssets.then(prepareTracker);
-handTracker.catch((err) => console.warn('Hand tracking unavailable', err)).finally(() => loading.complete('warmup'));
+handTracker.then(
+  () => {
+    trackingStatus.complete('warmup');
+    trackingStatus.ready();
+    performance.mark('sigil:tracking-ready');
+  },
+  (err) => {
+    console.warn('Hand tracking unavailable', err);
+    trackingStatus.failed();
+  },
+);
 
 const world3d = createScene(glCanvas);
 // Real 3D model files (public/models/*.glb); missing ones fall back to code-built models.
@@ -49,7 +62,11 @@ const models = preloadGlbModels(
   (file, loaded, total) => loading.progress(file, loaded, total),
   (file) => loading.complete(file),
 );
-Promise.allSettled([handTracker, models]).then(() => loading.hide());
+// The title shows as soon as the 3D scene and its models are ready.
+models.finally(() => {
+  loading.hide();
+  performance.mark('sigil:title-ready');
+});
 const overlay = createOverlay(overlayCanvas);
 const debugOverlay = createDebugOverlay();
 const cameraCorner = createCameraCorner();
@@ -146,7 +163,6 @@ function retryHands() {
       if (p) p.loaded = p.total;
       progress();
     },
-    hide: () => {},
   }).then(prepareTracker);
   connectHands(tracker);
 }

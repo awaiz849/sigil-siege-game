@@ -40,6 +40,13 @@
       .notice-banner .notice-box { padding: 8px 40px 8px 16px; font-size: 14px; border-width: 1px; border-radius: 8px;
         background: rgba(26, 22, 64, 0.92); text-align: left; }
       .notice-banner .notice-box p { margin: 0; }
+      /* Hand-tracking status in the corner while it loads in the background (src/ui/trackingIndicator.ts). */
+      #tracking-indicator { position: fixed; left: 12px; bottom: 12px; z-index: 15; pointer-events: none;
+        padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(242, 193, 78, 0.6);
+        background: rgba(13, 11, 36, 0.82); color: #e8e2ff; font: 13px system-ui, sans-serif; transition: opacity 0.6s; }
+      #tracking-indicator.ready { color: #9fe07a; border-color: rgba(159, 224, 122, 0.7); }
+      #tracking-indicator.failed { color: #ff9a8a; border-color: rgba(255, 120, 100, 0.6); }
+      #tracking-indicator.fade { opacity: 0; }
       .notice-close { position: absolute; top: 2px; right: 6px; border: 0; background: none; color: #F2C14E;
         font-size: 22px; line-height: 1; cursor: pointer; padding: 4px 6px; }
     </style>

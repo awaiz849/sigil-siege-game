@@ -7,6 +7,13 @@ type Part = { label: string; loaded: number; total: number; done: boolean };
 
 export type LoadingScreen = ReturnType<typeof createLoadingScreen>;
 
+/** Anything that shows download progress (the loading screen, the hand-tracking corner indicator). */
+export interface ProgressSink {
+  expect(key: string, label: string, expectedBytes: number): void;
+  progress(key: string, loaded: number, total?: number): void;
+  complete(key: string): void;
+}
+
 export function createLoadingScreen() {
   const root = document.getElementById('loading');
   const fill = document.getElementById('loading-fill');

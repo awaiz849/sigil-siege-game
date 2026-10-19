@@ -3,7 +3,7 @@
 // wasm, a buffer for the model), so nothing is downloaded twice. All files come from public/mediapipe
 // (offline, no CDN).
 import { CONFIG } from '../config.ts';
-import { fetchWithProgress, type LoadingScreen } from '../ui/loadingScreen.ts';
+import { fetchWithProgress, type ProgressSink } from '../ui/loadingScreen.ts';
 import { simulate } from '../ui/compat.ts';
 
 const BASE = `${import.meta.env.BASE_URL}mediapipe/`;
@@ -19,7 +19,7 @@ export interface HandAssets {
 
 let attempts = 0;
 
-export function downloadHandAssets(loading: LoadingScreen): Promise<HandAssets> {
+export function downloadHandAssets(loading: ProgressSink): Promise<HandAssets> {
   attempts++;
   const { wasm, handModel } = CONFIG.LOADING.expectedBytes;
   loading.expect('wasm', 'hand tracking engine', wasm);

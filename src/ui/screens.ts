@@ -1,6 +1,8 @@
 // Screens, all on the overlay canvas over the live 3D scene:
-//   handCheck  show palm, then point (live camera preview + skeleton)   -> title
-//   title      hover a difficulty button 0.8 s to pick it, hold palm 1.2 s (or hover START) to start
+//   title      shown first, as soon as the 3D scene is ready (hand tracking keeps loading in the background);
+//              hover a difficulty button 0.8 s to pick it, hold palm 1.2 s (or hover START) to start
+//   handCheck  on the first START with a camera: show palm, then point (live preview) -> the round;
+//              the only step that waits for hand tracking
 //   tutorial   how to draw every sigil (tutorial.ts); runs before the very first round, HOW TO PLAY replays it
 //   pause      RESUME / RESTART / EXIT TO MENU; hold palm to resume
 //   name       a top-5 score: pick 3 initials by hovering letters (or click / type), OK or hold palm
@@ -51,7 +53,10 @@ const BEST_KEY = 'sigil-siege-best';
 const bestKey = (d: Difficulty, hero: Hero) => (hero === 'wizard' ? d : `${hero}:${d}`);
 
 export function createScreens(opts: Opts) {
-  let screen: ScreenName | null = 'handCheck';
+  // The title shows first (as soon as the 3D scene is ready); the hand check runs on START.
+  let screen: ScreenName | null = 'title';
+  /** The hand check passed this session (it runs once, before the first round with the camera). */
+  let handChecked = false;
   let difficulty: Difficulty = 'normal';
   /** Level 1 = the wizard, level 2 = the Grand Warden. */
   let hero: Hero = 'wizard';
@@ -147,10 +152,24 @@ export function createScreens(opts: Opts) {
     sound.select();
   }
   function start() {
+    // First round this session with the camera: calibrate first. This is the only step that waits
+    // for hand tracking, which loads in the background while the menus are already usable.
+    if (!handChecked && opts.camera() !== 'failed' && !opts.mouseMode()) {
+      step = 0;
+      heldS = 0;
+      show('handCheck');
+      return;
+    }
     if (!tutorialDone(hero)) return openTutorial(true); // first time with this hero: learn his shapes first
     sound.start();
     screen = null;
     opts.onStart(difficulty, hero);
+  }
+  /** Hand check passed (or skipped): continue to the round (or the tutorial) that START asked for. */
+  function finishHandCheck() {
+    if (screen !== 'handCheck') return;
+    handChecked = true;
+    start();
   }
   function pickHero(h: Hero) {
     if (h === hero) return;
@@ -282,7 +301,7 @@ export function createScreens(opts: Opts) {
   window.addEventListener('keydown', (e) => {
     const confirm = e.key === 'Enter' || e.key === ' ';
     const back = e.key === 'Escape' || e.key === 'p' || e.key === 'P';
-    if (screen === 'handCheck' && confirm) show('title');
+    if (screen === 'handCheck' && confirm) finishHandCheck();
     else if (screen === 'tutorial') {
       if (e.key === 'Escape') tutorial.skipAll();
       else if (confirm && tutorial.onReadyPage) finishTutorial();
@@ -367,9 +386,9 @@ export function createScreens(opts: Opts) {
   }
 
   function updateHandCheck(dt: number) {
-    // No camera: skip straight to the title (mouse debug mode).
+    // No camera (mouse debug mode): nothing to check, carry on.
     if (opts.camera() === 'failed' || opts.mouseMode()) {
-      show('title');
+      finishHandCheck();
       return;
     }
     if (opts.camera() !== 'ready') return;
@@ -379,7 +398,7 @@ export function createScreens(opts: Opts) {
       step++;
       heldS = 0;
       sound.select();
-      if (step === 2) setTimeout(() => show('title'), 700);
+      if (step === 2) setTimeout(finishHandCheck, 700);
     }
   }
 
@@ -477,7 +496,7 @@ export function createScreens(opts: Opts) {
     else {
       ctx.font = `${20 * s}px ${FONT_TITLE}`;
       ctx.fillStyle = '#ffffff';
-      ctx.fillText('Starting camera' + '.'.repeat(1 + Math.floor(now / 400) % 3), W / 2, py + ph / 2);
+      ctx.fillText('Getting hand tracking ready' + '.'.repeat(1 + Math.floor(now / 400) % 3), W / 2, py + ph / 2);
     }
 
     // The two steps, ticked off as they pass.
