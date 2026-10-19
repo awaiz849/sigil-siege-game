@@ -72,6 +72,11 @@ export function createEnvironment(scene: THREE.Scene) {
     },
     /** The castle we stand on (the defeat cinematic knocks it down). */
     castle: { wall: wall.group, towers: landmarks.towers },
+    /** Auto quality: hide the purely decorative extras (ground mist, fireflies). Wave weather stays. */
+    setExtras(on: boolean) {
+      for (const m of mist.sprites) m.visible = on;
+      fireflies.points.visible = on;
+    },
     /** Blend the scenery between the wave themes (themes.ts). */
     setTheme(w: ThemeWeights) {
       for (const f of themed) f(w);

@@ -266,9 +266,11 @@ export const CONFIG = {
   INK: { enabled: true, color: 0x07050f, thickness: 1.2, fadeStart: 30, fadeEnd: 70 },
   /** Glow on emissive things. Turn off first if FPS drops (after shadows). */
   BLOOM: { enabled: true, strength: 0.9, radius: 0.55, threshold: 0.8, resolutionScale: 0.5 },
-  /** Automatic quality: if FPS stays under minFps for `seconds`, step down
-   *  (1 = bloom off, 2 = pixel ratio 1, 3 = pixel ratio 0.75). The D overlay shows the level. */
-  AUTO_QUALITY: { enabled: true, minFps: 45, seconds: 2.5 },
+  /** Automatic quality: if FPS stays under minFps for `seconds`, step down one level (logged to the
+   *  console only, nothing shown to the player; the D overlay shows the level):
+   *  1 = pixel ratio 1 + shadows off + extras off (ground mist, fireflies, particles x lowParticles),
+   *  2 = bloom off, 3 = pixel ratio 0.75. */
+  AUTO_QUALITY: { enabled: true, minFps: 40, seconds: 3, lowParticles: 0.5 },
   /** Loading screen: expected download sizes (bytes) so the bar is right from the start even when the
    *  server sends no Content-Length (warmUp = the bar's share for the hand-tracker warm-up, not a download);
    *  maxSeconds = never block the game longer than this. */

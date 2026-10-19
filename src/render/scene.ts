@@ -278,7 +278,7 @@ export function createScene(canvas: HTMLCanvasElement) {
   }
 
   // ---- Automatic quality: step down when the frame rate stays low.
-  let quality = 0; // 0 = full, 1 = no bloom, 2 = pixel ratio 1, 3 = pixel ratio 0.75
+  let quality = 0; // 0 = full, 1 = pixel ratio 1 + shadows off + extras off, 2 = no bloom, 3 = pixel ratio 0.75
   let fps = 60;
   let slowFor = 0;
   let warmup = 3; // ignore the first seconds (loading, shader compiles)
@@ -294,11 +294,19 @@ export function createScene(canvas: HTMLCanvasElement) {
     quality++;
     slowFor = 0;
     warmup = 1.5; // let the new setting settle before judging again
-    if (quality >= 2) {
-      renderer.setPixelRatio(quality === 2 ? 1 : 0.75);
+    if (quality === 1) {
+      renderer.setPixelRatio(1);
+      renderer.shadowMap.enabled = false;
+      key.castShadow = false;
+      environment.setExtras(false);
+      particles.setScale(CONFIG.AUTO_QUALITY.lowParticles);
+      resize(width, height);
+    } else if (quality === 3) {
+      renderer.setPixelRatio(0.75);
       resize(width, height);
     }
-    console.info(`Auto quality: level ${quality} (${['full', 'bloom off', 'pixel ratio 1', 'pixel ratio 0.75'][quality]})`);
+    const what = ['full', 'pixel ratio 1, shadows + extras off', 'bloom off', 'pixel ratio 0.75'][quality];
+    console.info(`Auto quality: level ${quality} (${what}) after ${CONFIG.AUTO_QUALITY.seconds} s under ${CONFIG.AUTO_QUALITY.minFps} fps`);
   }
 
   /** Draw one frame. dt in seconds. */
@@ -340,7 +348,7 @@ export function createScene(canvas: HTMLCanvasElement) {
 
     autoQuality(dt);
     // Post-processing chain: render -> ink outlines -> bloom (dropped first when FPS is low) -> output.
-    bloom.enabled = CONFIG.BLOOM.enabled && quality < 1;
+    bloom.enabled = CONFIG.BLOOM.enabled && quality < 2;
     composer.render(dt);
   }
 

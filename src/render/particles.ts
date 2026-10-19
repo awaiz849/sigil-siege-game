@@ -30,9 +30,16 @@ export function createParticles(scene: THREE.Scene) {
 
   const c = new THREE.Color();
 
+  /** Fraction of every burst actually spawned (auto quality lowers it on slow machines). */
+  let scale = 1;
+
   return {
+    setScale(s: number) {
+      scale = s;
+    },
     /** Spray `count` particles from a point. up = extra upward speed. */
     burst(at: THREE.Vector3, color: number, count: number, speed = 4, up = 2, lifetime = 0.8) {
+      count = Math.max(1, Math.round(count * scale));
       c.set(color);
       for (let n = 0; n < count; n++) {
         const i = next;
