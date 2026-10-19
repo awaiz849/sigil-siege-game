@@ -42,6 +42,9 @@ export function createEnding(refs: Refs) {
   const rubble: Array<{ m: THREE.Mesh; v: THREE.Vector3; spin: THREE.Vector3 }> = [];
   let boss: { model: EnemyModel; enemy: Enemy } | null = null;
   const banners: THREE.Object3D[] = [];
+  // Banner cloth + round face mask: drawn once on the first victory and reused every time after.
+  let fabric: THREE.CanvasTexture | null = null;
+  let faceMask: THREE.CanvasTexture | null = null;
   const camFrom = new THREE.Vector3();
   const lookFrom = new THREE.Vector3();
   // Where the camera ends up: out on the field, looking back at the castle.
@@ -84,8 +87,24 @@ export function createEnding(refs: Refs) {
       s.o.position.copy(s.pos);
       s.o.rotation.copy(s.rot);
     }
-    for (const r of rubble) r.m.geometry.dispose();
+    // Free the GPU memory of what the cinematic built (it leaked ~6 geometries + 2 textures per
+    // victory before). Rubble: boxes + their stone material. Banners: cloth + face meshes and their
+    // materials; the cloth / mask textures and the hero portraits are reused, so they stay.
+    const rubbleMats = new Set<THREE.Material>();
+    for (const r of rubble) {
+      r.m.geometry.dispose();
+      rubbleMats.add(r.m.material as THREE.Material);
+    }
+    rubbleMats.forEach((m) => m.dispose());
     rubble.length = 0;
+    for (const b of banners) {
+      b.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        mesh.geometry.dispose();
+        (mesh.material as THREE.Material).dispose();
+      });
+    }
     banners.length = 0;
     boss?.model.dispose();
     boss = null;
@@ -94,8 +113,8 @@ export function createEnding(refs: Refs) {
 
   /** Banners with the hero's face hanging down the castle wall (they unroll from the top). */
   function hangBanners() {
-    const fabric = bannerTexture();
-    const faceMask = circleTexture();
+    fabric ??= bannerTexture();
+    faceMask ??= circleTexture();
     for (const [x, w] of [[-5.5, 2.6], [0, 3.4], [5.5, 2.6]] as const) {
       const h = WALL_TOP - 0.6;
       const pivot = new THREE.Group(); // top edge: the banner unrolls downward from here

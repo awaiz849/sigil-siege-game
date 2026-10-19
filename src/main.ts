@@ -117,7 +117,25 @@ function newRound(difficulty: Difficulty, hero: Hero = world.hero) {
 
 // Dev only (npm run dev): window.sigil.world() in the browser console gives the live World,
 // e.g. sigil.world().castleHp = 30 to see the castle burn, or .time = 58 to jump to wave 3.
-if (import.meta.env.DEV) Object.assign(window, { sigil: { world: () => world, frames: () => frameCount } });
+// Memory checks (dev only): sigil.frame(now) runs one frame by hand (a hidden browser runs none),
+// sigil.memory() reads three.js's live GPU resources and the JS heap.
+if (import.meta.env.DEV) {
+  Object.assign(window, {
+    sigil: {
+      world: () => world,
+      frames: () => frameCount,
+      frame: (now: number) => frame(now),
+      screen: () => screens.current,
+      memory: () => ({
+        geometries: world3d.renderer.info.memory.geometries,
+        textures: world3d.renderer.info.memory.textures,
+        programs: world3d.renderer.info.programs?.length ?? 0,
+        sceneObjects: (() => { let n = 0; world3d.scene.traverse(() => n++); return n; })(),
+        heapMB: Math.round(((performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? 0) / 1048576),
+      }),
+    },
+  });
+}
 
 // Screens: hand check -> title -> (game) -> end. All hands-free.
 const screens = createScreens({
