@@ -22,11 +22,11 @@ import { PalmsPush } from './palmsPush.ts';
 
 export type HandInput = Awaited<ReturnType<typeof createHandInput>>;
 
-/** Starts the camera and builds the hand tracker from the already-downloading MediaPipe files.
+/** Starts the camera and uses the hand tracker prepared during the loading screen (prepareTracker).
  *  Throws if there is no camera (caller falls back to mouse). */
-export async function createHandInput(assets: Promise<HandAssets>) {
+export async function createHandInput(tracker: Promise<HandLandmarker>) {
   const video = await startCamera();
-  const landmarker = await createLandmarker(await assets);
+  const landmarker = await tracker;
 
   let enabled = true;
   let lastVideoTime = -1;
@@ -110,9 +110,27 @@ export async function createHandInput(assets: Promise<HandAssets>) {
     fy.reset();
   }
 
-  /** Call once per animation frame. */
+  // Detection is driven by the CAMERA's frames, not the render loop: requestVideoFrameCallback fires once
+  // per new video frame (~30 fps), so the 60 fps render frames don't carry the detection work.
+  // Browsers without it fall back to checking for a new frame from update() (once per render frame).
+  const useVideoFrames = typeof video.requestVideoFrameCallback === 'function';
+  if (useVideoFrames) {
+    const onVideoFrame = () => {
+      processFrame();
+      video.requestVideoFrameCallback(onVideoFrame);
+    };
+    video.requestVideoFrameCallback(onVideoFrame);
+  }
+
+  /** Call once per animation frame (only does work when requestVideoFrameCallback is missing). */
   function update() {
-    if (!enabled || video.readyState < 2 || video.currentTime === lastVideoTime) return;
+    if (!useVideoFrames) processFrame();
+  }
+
+  /** Detect hands in the newest camera frame (at most once per frame) and emit the contract events. */
+  function processFrame() {
+    // Hidden tab: no detection at all (the game is paused too); resumes on the next frame.
+    if (!enabled || document.hidden || video.readyState < 2 || video.currentTime === lastVideoTime) return;
     lastVideoTime = video.currentTime;
 
     const now = performance.now();
@@ -234,6 +252,21 @@ async function startCamera(): Promise<HTMLVideoElement> {
 }
 
 /** GPU delegate first, CPU if the GPU path fails. */
+/** Build the tracker from the downloaded files and run one detection on a blank frame. The first
+ *  detection compiles MediaPipe's GPU shaders (measured: ~5 s), so doing it during the loading screen
+ *  avoids a freeze the moment the camera starts. Needs no camera. */
+export async function prepareTracker(assets: HandAssets): Promise<HandLandmarker> {
+  const landmarker = await createLandmarker(assets);
+  const blank = document.createElement('canvas');
+  blank.width = CONFIG.CAMERA_WIDTH;
+  blank.height = CONFIG.CAMERA_HEIGHT;
+  blank.getContext('2d')?.fillRect(0, 0, blank.width, blank.height);
+  const t0 = performance.now();
+  landmarker.detectForVideo(blank, t0);
+  console.info(`Hand tracker warmed up in ${Math.round(performance.now() - t0)} ms`);
+  return landmarker;
+}
+
 export async function createLandmarker(assets: HandAssets): Promise<HandLandmarker> {
   // The one wasm build we ship (already downloaded by handAssets.ts, so no second download).
   // (FilesetResolver.forVisionTasks would also look for the nosimd build, which we deleted.)

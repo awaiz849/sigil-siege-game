@@ -13,7 +13,7 @@ import { playCast, playEvents, sound } from './audio/sound.ts';
 import { setMusicIntensity, updateMusic } from './audio/music.ts';
 import { callout } from './audio/voice.ts';
 import { createMouseInput } from './input/mouseInput.ts';
-import { createHandInput, type HandInput } from './input/handInput.ts';
+import { createHandInput, prepareTracker, type HandInput } from './input/handInput.ts';
 import { downloadHandAssets } from './input/handAssets.ts';
 import { createLoadingScreen } from './ui/loadingScreen.ts';
 import { onPalm, onStrokeEnd, onStrokePoint, onStrokeStart, onThrow } from './events.ts';
@@ -35,7 +35,10 @@ document.body.append(glCanvas, vignette, overlayCanvas);
 // wasm, the hand model and the 3D models, all started now in parallel; it hides when all are done.
 const loading = createLoadingScreen();
 const handAssets = downloadHandAssets(loading);
-handAssets.catch((err) => console.warn('Hand tracking files failed to download', err));
+// Build + warm up the hand tracker during the loading screen (its first run compiles GPU shaders).
+loading.expect('warmup', 'hand tracking (warming up)', CONFIG.LOADING.expectedBytes.warmUp);
+const handTracker = handAssets.then(prepareTracker);
+handTracker.catch((err) => console.warn('Hand tracking unavailable', err)).finally(() => loading.complete('warmup'));
 
 const world3d = createScene(glCanvas);
 // Real 3D model files (public/models/*.glb); missing ones fall back to code-built models.
@@ -44,7 +47,7 @@ const models = preloadGlbModels(
   (file, loaded, total) => loading.progress(file, loaded, total),
   (file) => loading.complete(file),
 );
-Promise.allSettled([handAssets, models]).then(() => loading.hide());
+Promise.allSettled([handTracker, models]).then(() => loading.hide());
 const overlay = createOverlay(overlayCanvas);
 const debugOverlay = createDebugOverlay();
 const cameraCorner = createCameraCorner();
@@ -75,7 +78,7 @@ function setMouseMode(on: boolean) {
   overlay.setMouseDebug(on);
 }
 
-createHandInput(handAssets)
+createHandInput(handTracker)
   .then((h) => {
     hand = h;
     camera = 'ready';
