@@ -10,6 +10,9 @@
 // animation plays that instead.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+// The GLB files are meshopt-compressed (EXT_meshopt_compression, about half the size); this decoder
+// ships inside three.js (wasm embedded in the file), so it works offline.
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { CONFIG, type GlbModelConfig } from '../config.ts';
 import type { Element, EnemyType } from '../game/types.ts';
@@ -24,7 +27,7 @@ const waiting = new Map<string, Array<(model: THREE.Object3D) => void>>();
 
 /** Start loading every configured model file. Resolves when all have loaded or failed. */
 export function preloadGlbModels(): Promise<void> {
-  const loader = new GLTFLoader();
+  const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
   const base = `${import.meta.env.BASE_URL}`;
   const jobs = Object.entries(CONFIG.GLB_MODELS).map(([key, cfg]) =>
     loader
