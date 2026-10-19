@@ -23,6 +23,25 @@
       #loading .bar { width: min(420px, 80vw); height: 14px; border: 2px solid #F2C14E; border-radius: 4px; padding: 2px; }
       #loading-fill { height: 100%; width: 0%; background: #F2C14E; transition: width 0.15s; }
       #loading-text { margin: 0; font-family: monospace; font-size: 14px; opacity: 0.85; min-height: 1.2em; }
+      /* Friendly error / info notices (src/ui/notice.ts): plain HTML, so they work even without WebGL. */
+      .notice { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center;
+        padding: 16px; background: rgba(13, 11, 36, 0.92); }
+      .notice-box { position: relative; max-width: 560px; width: 100%; box-sizing: border-box; padding: 28px 28px 24px;
+        background: #1a1640; border: 2px solid #F2C14E; border-radius: 10px; color: #e8e2ff;
+        font: 17px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif; text-align: center; }
+      .notice-box h2 { margin: 0 0 12px; font: 700 26px 'Silkscreen', monospace; color: #F2C14E; letter-spacing: 0.04em; }
+      .notice-box p { margin: 0 0 10px; }
+      .notice-hint { font-size: 14px; opacity: 0.75; }
+      .notice-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 18px; }
+      .notice-actions button { font: 700 15px system-ui, sans-serif; padding: 10px 22px; border-radius: 6px; cursor: pointer;
+        border: 2px solid #F2C14E; background: transparent; color: #F2C14E; }
+      .notice-actions button.primary { background: #F2C14E; color: #0D0B24; }
+      .notice-banner { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 19; max-width: calc(100vw - 32px); }
+      .notice-banner .notice-box { padding: 8px 40px 8px 16px; font-size: 14px; border-width: 1px; border-radius: 8px;
+        background: rgba(26, 22, 64, 0.92); text-align: left; }
+      .notice-banner .notice-box p { margin: 0; }
+      .notice-close { position: absolute; top: 2px; right: 6px; border: 0; background: none; color: #F2C14E;
+        font-size: 22px; line-height: 1; cursor: pointer; padding: 4px 6px; }
     </style>
   </head>
   <body>
@@ -31,6 +50,6 @@
       <div class="bar"><div id="loading-fill"></div></div>
       <p id="loading-text">Loading...</p>
     </div>
-    <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/src/boot.ts"></script>
   </body>
 </html>

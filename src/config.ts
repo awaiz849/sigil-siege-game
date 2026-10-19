@@ -196,6 +196,9 @@ export const CONFIG = {
   // ---- Screens ----
   /** Hand check: each pose must be held this long to pass. */
   HAND_CHECK_HOLD_S: 0.6,
+  /** No hand in view for pauseAfterS during a round -> auto-pause ("Show your hand to continue");
+   *  it resumes by itself once the hand has been back for resumeAfterS. */
+  HAND_LOST: { pauseAfterS: 3, resumeAfterS: 0.5 },
   /** Wait after the round ends before the end screen appears. */
   END_SCREEN_DELAY_S: 5,
   /** Victory / defeat cinematic (render/ending.ts): seconds for the camera to swing out over the field. */

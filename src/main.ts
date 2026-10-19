@@ -13,7 +13,9 @@ import { playCast, playEvents, setAudioPaused, sound } from './audio/sound.ts';
 import { setMusicIntensity, updateMusic } from './audio/music.ts';
 import { callout } from './audio/voice.ts';
 import { createMouseInput } from './input/mouseInput.ts';
-import { createHandInput, prepareTracker, type HandInput } from './input/handInput.ts';
+import { createHandInput, prepareTracker, TrackerLoadError, type HandInput } from './input/handInput.ts';
+import { CAMERA_MESSAGES, cameraProblem, simulate } from './ui/compat.ts';
+import { hideNotice, reloadAction, setNoticeText, showNotice } from './ui/notice.ts';
 import { downloadHandAssets } from './input/handAssets.ts';
 import { createLoadingScreen } from './ui/loadingScreen.ts';
 import { onPalm, onStrokeEnd, onStrokePoint, onStrokeStart, onThrow } from './events.ts';
@@ -78,20 +80,78 @@ function setMouseMode(on: boolean) {
   overlay.setMouseDebug(on);
 }
 
-createHandInput(handTracker)
-  .then((h) => {
-    hand = h;
-    camera = 'ready';
-    setMouseMode(false);
-    overlay.flash('Hand tracking ready', 1.5);
-  })
-  .catch((err) => {
-    // No camera (or it was refused): MOUSE DEBUG MODE, clearly labelled.
-    console.warn('Hand input unavailable, using mouse debug mode', err);
+// "Play with the mouse instead": the clearly labelled MOUSE DEBUG MODE, offered on camera problems.
+const mouseAction = (id: string) => ({
+  label: 'Play with the mouse instead',
+  onClick: () => {
+    hideNotice(id);
     camera = 'failed';
     setMouseMode(true);
-    overlay.flash('No camera found', 2);
-  });
+  },
+});
+
+/** Camera + hand tracker -> hand input. Every failure ends in a friendly message that says what to do. */
+function connectHands(tracker: Promise<Awaited<typeof handTracker>>) {
+  createHandInput(tracker)
+    .then((h) => {
+      hand = h;
+      camera = 'ready';
+      setMouseMode(false);
+      hideNotice('tracker');
+      overlay.flash('Hand tracking ready', 1.5);
+    })
+    .catch(async (err) => {
+      console.warn('Hand input unavailable', err);
+      // Dev simulation of a lost hand needs a round to run: just use the mouse.
+      if (simulate === 'hand-lost') return mouseAction('none').onClick();
+      // MediaPipe failed (download or start-up)? That comes first: Retry fixes it without a reload.
+      const trackerOk = await tracker.then(() => true, () => false);
+      if (err instanceof TrackerLoadError || !trackerOk) {
+        showNotice({
+          id: 'tracker',
+          title: 'Hand tracking failed to load',
+          body: 'The hand-tracking files (MediaPipe) could not be downloaded or started.',
+          hint: 'Check your internet connection and press Retry.',
+          actions: [{ label: 'Retry', primary: true, onClick: retryHands }, { ...reloadAction('Reload page'), primary: false }],
+        });
+        return;
+      }
+      const msg = CAMERA_MESSAGES[cameraProblem(err)];
+      showNotice({ id: 'camera', title: msg.title, body: msg.body, hint: msg.hint, actions: [reloadAction(), mouseAction('camera')] });
+    });
+}
+
+/** Retry: download MediaPipe again (showing the percentage), rebuild the tracker, reconnect the camera. */
+function retryHands() {
+  showNotice({ id: 'tracker', title: 'Retrying...', body: 'Downloading hand tracking... 0%' });
+  const parts = new Map<string, { loaded: number; total: number }>();
+  const progress = () => {
+    let l = 0;
+    let t = 0;
+    for (const p of parts.values()) {
+      l += Math.min(p.loaded, p.total);
+      t += p.total;
+    }
+    setNoticeText('tracker', `Downloading hand tracking... ${t ? Math.floor((l / t) * 100) : 0}%`);
+  };
+  const tracker = downloadHandAssets({
+    expect: (key, _label, bytes) => parts.set(key, { loaded: 0, total: bytes }),
+    progress: (key, loaded, total) => {
+      const p = parts.get(key);
+      if (p) Object.assign(p, { loaded, total: total || p.total });
+      progress();
+    },
+    complete: (key) => {
+      const p = parts.get(key);
+      if (p) p.loaded = p.total;
+      progress();
+    },
+    hide: () => {},
+  }).then(prepareTracker);
+  connectHands(tracker);
+}
+
+connectHands(handTracker);
 
 // Template recorder (debug). Its messages show on the overlay.
 const recorder = createRecorder((msg) => {
@@ -124,7 +184,14 @@ if (import.meta.env.DEV) {
     sigil: {
       world: () => world,
       frames: () => frameCount,
-      frame: (now: number) => frame(now),
+      // One frame by hand; the extra animation frame it schedules is cancelled again, so the
+      // normal loop keeps running as a single loop.
+      frame: (now: number) => {
+        const before = rafId;
+        frame(now);
+        cancelAnimationFrame(rafId);
+        rafId = before;
+      },
       screen: () => screens.current,
       memory: () => ({
         geometries: world3d.renderer.info.memory.geometries,
@@ -325,14 +392,25 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
+/** Last time the hand was seen during a round (for the hand-lost auto-pause). */
+let handSeenAt = 0;
+
 function frame(now: number) {
   frameCount++;
+  if (simulate === 'crash' && frameCount === 5) throw new Error('Simulated crash (dev only)');
   // Never 0: update() treats time 0 as "round just started".
   const realDt = lastNow ? Math.min(0.1, (now - lastNow) / 1000) : 1 / 60;
   const dt = now < slowMoUntil ? realDt * CONFIG.BOSS_ENTRANCE.speed : realDt;
   lastNow = now;
   hand?.update();
   screens.update(now);
+  // Hand out of view for HAND_LOST.pauseAfterS during a round -> auto-pause until it is back.
+  const tracking = (camera === 'ready' && !mouse.isEnabled()) || simulate === 'hand-lost';
+  const handVisible = simulate !== 'hand-lost' && !!hand?.debug.handVisible;
+  if (tracking && world.phase === 'PLAYING' && !screens.current) {
+    if (handVisible) handSeenAt = now;
+    else if (now - handSeenAt > CONFIG.HAND_LOST.pauseAfterS * 1000) screens.pauseForHand();
+  } else handSeenAt = now;
   updateMusic();
   // Paused, or a kill's hit-stop: the round and the 3D scene freeze (time stands still).
   const frozen = screens.current === 'pause' || now < hitStopUntil;

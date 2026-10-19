@@ -163,17 +163,29 @@ export function createScreens(opts: Opts) {
     sound.select();
     show('pause');
   }
+  // Paused because the hand left the camera: resumes by itself when the hand is back.
+  let handLost = false;
+  let handBackS = 0;
+  function pauseForHand() {
+    if (screen !== null || !opts.playing()) return;
+    handLost = true;
+    handBackS = 0;
+    show('pause');
+  }
   function resume() {
     sound.select();
+    handLost = false;
     screen = null;
   }
   function restart() {
     sound.start();
+    handLost = false;
     screen = null;
     opts.onRestart();
   }
   function exitToMenu() {
     sound.select();
+    handLost = false;
     opts.onExit();
     show('title');
   }
@@ -376,11 +388,18 @@ export function createScreens(opts: Opts) {
       return screen;
     },
     show,
+    /** Auto-pause: no hand in view for a while during a round (main.ts decides when). */
+    pauseForHand,
 
     update(now: number) {
       const dt = Math.min(0.1, (now - lastNow) / 1000);
       lastNow = now;
       if (screen === 'handCheck') updateHandCheck(dt);
+      // Hand back in view for a moment: carry on automatically.
+      if (screen === 'pause' && handLost) {
+        handBackS = opts.hand()?.debug.handVisible ? handBackS + dt : 0;
+        if (handBackS >= CONFIG.HAND_LOST.resumeAfterS) resume();
+      }
       if (screen === 'tutorial') {
         tutorial.update(now);
         // Reaching the last page: an open palm from the shield page must close before it can start the round.
@@ -566,6 +585,15 @@ export function createScreens(opts: Opts) {
   // ---------------------------------------------------------------- pause
 
   function drawPause(ctx: CanvasRenderingContext2D, s: number, now: number) {
+    if (handLost) {
+      // Auto-pause: the camera lost the hand. Say exactly what to do; it resumes on its own.
+      title(ctx, 'SHOW YOUR HAND', H * 0.2, 60 * s, GOLD);
+      ctx.font = `${20 * s}px ${FONT_TEXT}`;
+      ctx.fillStyle = '#e8e2ff';
+      ctx.fillText('Show your hand to the camera to continue.', W / 2, H * 0.29);
+      pauseButtons.forEach((b, i) => drawButton(ctx, b, i === 0, s));
+      return;
+    }
     title(ctx, 'PAUSED', H * 0.24, 72 * s, GOLD);
     pauseButtons.forEach((b, i) => drawButton(ctx, b, i === 0, s));
     confirmPrompt(ctx, s, now, H * 0.38 + 240 * s, 'TO RESUME', 'or press ESC');

@@ -4,6 +4,7 @@
 // (offline, no CDN).
 import { CONFIG } from '../config.ts';
 import { fetchWithProgress, type LoadingScreen } from '../ui/loadingScreen.ts';
+import { simulate } from '../ui/compat.ts';
 
 const BASE = `${import.meta.env.BASE_URL}mediapipe/`;
 
@@ -16,12 +17,21 @@ export interface HandAssets {
   model: Uint8Array;
 }
 
+let attempts = 0;
+
 export function downloadHandAssets(loading: LoadingScreen): Promise<HandAssets> {
+  attempts++;
   const { wasm, handModel } = CONFIG.LOADING.expectedBytes;
   loading.expect('wasm', 'hand tracking engine', wasm);
   loading.expect('handModel', 'hand model', handModel);
-  const get = (key: string, url: string) =>
-    fetchWithProgress(url, (l, t) => loading.progress(key, l, t)).finally(() => loading.complete(key));
+  const get = (key: string, url: string) => {
+    // Dev-only: the first download "fails" so the error screen and its Retry can be tested.
+    if (simulate === 'mediapipe-fail' && attempts === 1) {
+      loading.complete(key);
+      return Promise.reject(new Error(`simulated download failure: ${url}`));
+    }
+    return fetchWithProgress(url, (l, t) => loading.progress(key, l, t)).finally(() => loading.complete(key));
+  };
 
   return Promise.all([
     get('wasm', `${BASE}wasm/vision_wasm_internal.wasm`),

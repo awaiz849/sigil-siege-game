@@ -17,6 +17,7 @@ import { OneEuroFilter } from './oneEuro.ts';
 import { classifyPose, pinchRatio, PoseStabilizer, type Landmark } from './poses.ts';
 import { isStrokeLongEnough } from './strokeFilter.ts';
 import type { HandAssets } from './handAssets.ts';
+import { isSecure, simulate } from '../ui/compat.ts';
 import { ThrowDetector } from './throwDetector.ts';
 import { PalmsPush } from './palmsPush.ts';
 
@@ -26,7 +27,14 @@ export type HandInput = Awaited<ReturnType<typeof createHandInput>>;
  *  Throws if there is no camera (caller falls back to mouse). */
 export async function createHandInput(tracker: Promise<HandLandmarker>) {
   const video = await startCamera();
-  const landmarker = await tracker;
+  let landmarker: HandLandmarker;
+  try {
+    landmarker = await tracker;
+  } catch (err) {
+    // The camera works but MediaPipe failed to load: free the camera and say so (main.ts offers Retry).
+    for (const t of (video.srcObject as MediaStream).getTracks()) t.stop();
+    throw new TrackerLoadError(err);
+  }
 
   let enabled = true;
   let lastVideoTime = -1;
@@ -238,7 +246,23 @@ export async function createHandInput(tracker: Promise<HandLandmarker>) {
   };
 }
 
+/** MediaPipe (wasm or hand model) failed to download or start; the camera itself was fine. */
+export class TrackerLoadError extends Error {
+  readonly cause: unknown;
+  constructor(cause: unknown) {
+    super('Hand tracking failed to load');
+    this.name = 'TrackerLoadError';
+    this.cause = cause;
+  }
+}
+
 async function startCamera(): Promise<HTMLVideoElement> {
+  // Dev-only: pretend the camera failed in a specific way (see ui/compat.ts).
+  if (simulate === 'camera-denied') throw new DOMException('Permission denied', 'NotAllowedError');
+  if (simulate === 'no-camera') throw new DOMException('Requested device not found', 'NotFoundError');
+  if (simulate === 'camera-busy') throw new DOMException('Could not start video source', 'NotReadableError');
+  // Over plain http the browser hides navigator.mediaDevices entirely.
+  if (!isSecure() || !navigator.mediaDevices?.getUserMedia) throw new DOMException('Camera needs a secure context', 'SecurityError');
   const stream = await navigator.mediaDevices.getUserMedia({
     video: { width: CONFIG.CAMERA_WIDTH, height: CONFIG.CAMERA_HEIGHT, facingMode: 'user' },
     audio: false,
