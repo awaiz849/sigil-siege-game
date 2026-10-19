@@ -5,6 +5,8 @@
 {
   "name": "sigil-siege",
   "compatibility_date": "2026-10-01",
+  // Keep the free *.workers.dev URL enabled on every deploy.
+  "workers_dev": true,
   "assets": {
     "directory": "./dist",
     // Unknown paths serve index.html instead of a 404.
