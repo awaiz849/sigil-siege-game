@@ -1,0 +1,13 @@
+// Cloudflare Workers deployment: a static-assets-only Worker (no server code).
+// Build first (`npm run build`), then deploy the dist/ folder with `npx wrangler deploy`.
+// public/_headers is copied into dist/ by Vite and applied by Cloudflare (long cache for
+// MediaPipe and the 3D models, application/wasm for .wasm).
+{
+  "name": "sigil-siege",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    // Unknown paths serve index.html instead of a 404.
+    "not_found_handling": "single-page-application"
+  }
+}
