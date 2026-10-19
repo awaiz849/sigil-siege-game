@@ -25,13 +25,17 @@ type Loaded = { scene: THREE.Object3D; clips: THREE.AnimationClip[]; baseHeight:
 const cache = new Map<string, Loaded>();
 const waiting = new Map<string, Array<(model: THREE.Object3D) => void>>();
 
-/** Start loading every configured model file. Resolves when all have loaded or failed. */
-export function preloadGlbModels(): Promise<void> {
+/** Start loading every configured model file. Resolves when all have loaded or failed.
+ *  onProgress(file, loaded, total) / onDone(file) feed the loading screen (optional). */
+export function preloadGlbModels(
+  onProgress?: (file: string, loaded: number, total: number) => void,
+  onDone?: (file: string) => void,
+): Promise<void> {
   const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
   const base = `${import.meta.env.BASE_URL}`;
   const jobs = Object.entries(CONFIG.GLB_MODELS).map(([key, cfg]) =>
     loader
-      .loadAsync(base + cfg.file)
+      .loadAsync(base + cfg.file, (e) => onProgress?.(cfg.file, e.loaded, e.lengthComputable ? e.total : 0))
       .then((gltf) => {
         const root = gltf.scene;
         // Some exported files have no surface normals; lighting needs them.
@@ -48,7 +52,8 @@ export function preloadGlbModels(): Promise<void> {
       })
       .catch(() => {
         // No file yet: the code-built model is used instead.
-      }),
+      })
+      .finally(() => onDone?.(cfg.file)),
   );
   return Promise.all(jobs).then(() => undefined);
 }

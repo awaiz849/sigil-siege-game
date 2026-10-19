@@ -16,17 +16,17 @@ import { emitCursor, emitPalm, emitStrokeEnd, emitStrokePoint, emitStrokeStart, 
 import { OneEuroFilter } from './oneEuro.ts';
 import { classifyPose, pinchRatio, PoseStabilizer, type Landmark } from './poses.ts';
 import { isStrokeLongEnough } from './strokeFilter.ts';
+import type { HandAssets } from './handAssets.ts';
 import { ThrowDetector } from './throwDetector.ts';
 import { PalmsPush } from './palmsPush.ts';
 
-const BASE = `${import.meta.env.BASE_URL}mediapipe/`;
-
 export type HandInput = Awaited<ReturnType<typeof createHandInput>>;
 
-/** Starts the camera and loads the model. Throws if there is no camera (caller falls back to mouse). */
-export async function createHandInput() {
+/** Starts the camera and builds the hand tracker from the already-downloading MediaPipe files.
+ *  Throws if there is no camera (caller falls back to mouse). */
+export async function createHandInput(assets: Promise<HandAssets>) {
   const video = await startCamera();
-  const landmarker = await createLandmarker();
+  const landmarker = await createLandmarker(await assets);
 
   let enabled = true;
   let lastVideoTime = -1;
@@ -234,15 +234,12 @@ async function startCamera(): Promise<HTMLVideoElement> {
 }
 
 /** GPU delegate first, CPU if the GPU path fails. */
-async function createLandmarker(): Promise<HandLandmarker> {
-  // Point straight at the one wasm build we ship. (FilesetResolver.forVisionTasks would
-  // also look for the nosimd build, which we deleted.)
-  const fileset = {
-    wasmLoaderPath: `${BASE}wasm/vision_wasm_internal.js`,
-    wasmBinaryPath: `${BASE}wasm/vision_wasm_internal.wasm`,
-  };
+export async function createLandmarker(assets: HandAssets): Promise<HandLandmarker> {
+  // The one wasm build we ship (already downloaded by handAssets.ts, so no second download).
+  // (FilesetResolver.forVisionTasks would also look for the nosimd build, which we deleted.)
+  const fileset = { wasmLoaderPath: assets.wasmLoaderPath, wasmBinaryPath: assets.wasmBinaryPath };
   const options = (delegate: 'GPU' | 'CPU') => ({
-    baseOptions: { modelAssetPath: `${BASE}hand_landmarker.task`, delegate },
+    baseOptions: { modelAssetBuffer: assets.model, delegate },
     runningMode: 'VIDEO' as const,
     numHands: CONFIG.PALMS_PUSH.enabled ? 2 : 1,
     minHandDetectionConfidence: CONFIG.HAND_DETECTION_CONFIDENCE,

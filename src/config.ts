@@ -269,6 +269,9 @@ export const CONFIG = {
   /** Automatic quality: if FPS stays under minFps for `seconds`, step down
    *  (1 = bloom off, 2 = pixel ratio 1, 3 = pixel ratio 0.75). The D overlay shows the level. */
   AUTO_QUALITY: { enabled: true, minFps: 45, seconds: 2.5 },
+  /** Loading screen: expected download sizes (bytes) so the bar is right from the start even when the
+   *  server sends no Content-Length; maxSeconds = never block the game longer than this. */
+  LOADING: { expectedBytes: { wasm: 13_519_922, handModel: 7_819_105, glbModel: 380_000 }, maxSeconds: 60 },
   /** Soft mist sprites over the field (big transparent sprites cost fill rate). */
   MIST_SPRITES: 8,
   /** Scenery per wave (render only; colours in render/themes.ts). byWave = theme for waves 1, 2, 3:

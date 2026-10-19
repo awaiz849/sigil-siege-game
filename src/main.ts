@@ -14,6 +14,8 @@ import { setMusicIntensity, updateMusic } from './audio/music.ts';
 import { callout } from './audio/voice.ts';
 import { createMouseInput } from './input/mouseInput.ts';
 import { createHandInput, type HandInput } from './input/handInput.ts';
+import { downloadHandAssets } from './input/handAssets.ts';
+import { createLoadingScreen } from './ui/loadingScreen.ts';
 import { onPalm, onStrokeEnd, onStrokePoint, onStrokeStart, onThrow } from './events.ts';
 import { classify } from './recognizer/index.ts';
 import { createRecorder } from './recognizer/recorder.ts';
@@ -29,9 +31,20 @@ const vignette = document.createElement('div');
 vignette.id = 'vignette';
 document.body.append(glCanvas, vignette, overlayCanvas);
 
+// Loading screen (index.html, visible from the first paint): real download progress of the MediaPipe
+// wasm, the hand model and the 3D models, all started now in parallel; it hides when all are done.
+const loading = createLoadingScreen();
+const handAssets = downloadHandAssets(loading);
+handAssets.catch((err) => console.warn('Hand tracking files failed to download', err));
+
 const world3d = createScene(glCanvas);
-// Real 3D model files (public/models/*.glb) load during the menus; missing ones fall back to code-built models.
-preloadGlbModels();
+// Real 3D model files (public/models/*.glb); missing ones fall back to code-built models.
+for (const cfg of Object.values(CONFIG.GLB_MODELS)) loading.expect(cfg.file, '3D models', CONFIG.LOADING.expectedBytes.glbModel);
+const models = preloadGlbModels(
+  (file, loaded, total) => loading.progress(file, loaded, total),
+  (file) => loading.complete(file),
+);
+Promise.allSettled([handAssets, models]).then(() => loading.hide());
 const overlay = createOverlay(overlayCanvas);
 const debugOverlay = createDebugOverlay();
 const cameraCorner = createCameraCorner();
@@ -62,7 +75,7 @@ function setMouseMode(on: boolean) {
   overlay.setMouseDebug(on);
 }
 
-createHandInput()
+createHandInput(handAssets)
   .then((h) => {
     hand = h;
     camera = 'ready';
